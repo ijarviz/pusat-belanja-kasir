@@ -5,9 +5,9 @@ import { createPortal } from "react-dom"
 import { Input } from "@/components/ui/input"
 import { Check, Loader2, MapPin, Search, X } from "lucide-react"
 
+// Kecamatan Autolaris H2H (district_id = id_distrik, kode BPS).
 export type Area = {
   district_id: string
-  autokirim_district_id: number
   district_name: string
   regency_name: string
   province_name: string
@@ -15,7 +15,7 @@ export type Area = {
 
 // Nilai pickup yang tersimpan: hanya district_id + nama gabungan yang di-cache
 // di outlet_pickup_point (pp_district_id / pp_district_name). Dipakai untuk
-// menampilkan area terpilih tanpa perlu lookup ulang ke shipment-service.
+// menampilkan area terpilih tanpa perlu lookup ulang ke database.
 export type PickupArea = {
   district_id: string
   district_name: string

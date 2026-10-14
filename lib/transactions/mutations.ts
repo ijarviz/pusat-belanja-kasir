@@ -11,8 +11,8 @@ export async function updateTransactionField(
 }
 
 // Batalkan pengiriman (void AWB) untuk satu transaksi lewat route handler server
-// (API key shipment-service tidak boleh sampai ke browser). Route handler yang
-// memanggil shipment-service dan menandai transaksi cancelled.
+// (API key Autolaris outlet tidak boleh sampai ke browser). Route handler yang
+// memanggil Autolaris H2H /cancel dan menandai transaksi cancelled.
 export async function cancelShipment(id: string): Promise<void> {
   const res = await fetch(`/api/shipment/cancel/${id}`, {
     method: "POST",

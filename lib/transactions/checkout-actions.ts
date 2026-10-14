@@ -101,7 +101,7 @@ export async function createStoreTransactionAction(
     success: true,
     transaction: {
       ...normalizeTransaction(row),
-      autokirim_area: null,
+      destination_area: null,
     },
   }
 }

@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `kasir` (package name `kasir-gudang-import`) is the **point-of-sale (kasir) app for Pusat Belanja outlets**. It is **not** one of the CodeIgniter/Autolaris Shop API storefronts described in `/autolaris/websites/CLAUDE.md`. It is a Next.js 16 (App Router, React 19) app.
 
-**Since 2026-10-14 its data lives in this server's MariaDB (database `pusatbelanja`), not Supabase.** The schema, procedures and triggers are in `../docs/db-pusatbelanja-mariadb.sql` and `../docs/db-function-pusatbelanja-mariadb.sql`. It shares that database with the admin dashboard `../panel/` ("gudang-import"), which moved first and whose data layer this app reuses, and with the storefront `../store/`. The Supabase data was imported on 2026-10-14 (`../docs/import/`). See `../CLAUDE.md` for how the three fit together. Shipping goes through a separate **shipment-service** (AutoKirim).
+**Since 2026-10-14 its data lives in this server's MariaDB (database `pusatbelanja`), not Supabase.** The schema, procedures and triggers are in `../docs/db-pusatbelanja-mariadb.sql` and `../docs/db-function-pusatbelanja-mariadb.sql`. It shares that database with the admin dashboard `../panel/` ("gudang-import"), which moved first and whose data layer this app reuses, and with the storefront `../store/`. The Supabase data was imported on 2026-10-14 (`../docs/import/`). See `../CLAUDE.md` for how the three fit together. Since 2026-10-14 web-order payment and shipping go through **Autolaris H2H** (`https://api-h2h.autolaris.com/api/h2h/*`, the same API `webmarket` uses), with one API key per outlet. AutoKirim and Midtrans are no longer used.
 
 Users, passwords and outlet memberships are managed in `panel` (Akses Tim page). This app only logs users in.
 
@@ -33,10 +33,10 @@ Env vars (`.env*` is gitignored; `.env.local` on this server already holds local
 - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`: MariaDB. The same credentials are in `../.db-credentials`.
 - `AUTH_SECRET`: signs the session cookie, at least 32 characters. Changing it logs everyone out.
 - `UPLOAD_DIR` / `UPLOAD_PUBLIC_URL`: images uploaded by `panel`. Image URLs in the DB are relative (`/uploads/<bucket>/<file>`), and `app/uploads/[bucket]/[file]` (a copy of `store`'s route) serves them from the same disk. Keep `UPLOAD_PUBLIC_URL` unset or `/uploads`; an absolute host is only added to `next/image` remote patterns.
-- `SHIPMENT_SERVICE_URL`, `SHIPMENT_API_KEY`: server-only, never expose to the client.
+- `AL_H2H_BASE_URL` (optional, default `https://api-h2h.autolaris.com`). The API key isn't an env var: it is stored per outlet in `outlet_credentials` (`AL_H2H_API_KEY`) and set in `panel` (Pengaturan > Metode Order).
 - Optional: `NEXT_PUBLIC_APP_URL`, `PUPPETEER_EXECUTABLE_PATH`, `DB_POOL_SIZE`.
 
-**Hosting.** The app can no longer run on Vercel, because MariaDB is only reachable from this server. It has to be hosted here (systemd + Apache reverse proxy, like `webmarket-jobs`); that isn't set up yet. WebUSB and Web Bluetooth printing need HTTPS.
+**Hosting.** The app can no longer run on Vercel, because MariaDB is only reachable from this server. It is hosted here since 2026-10-14 (systemd `pusatbelanja-kasir` + haproxy, `kasir.pusatbelanja.top`; see "Hosting" in `../CLAUDE.md`). WebUSB and Web Bluetooth printing need HTTPS.
 
 ## Architecture
 
@@ -56,7 +56,12 @@ Env vars (`.env*` is gitignored; `.env.local` on this server already holds local
 
 **Shipping labels (resi) are PDFs rendered server-side with headless Chrome.** `app/print/[id]/pdf/route.ts` and `app/print/bulk/pdf/route.ts` launch Chromium through `lib/pdf/browser.ts` and load the app's own `/print/[id]` page, forwarding the caller's raw `Cookie` header (`pb_session` + `outlet_id`) so the page can authenticate. `/print` pages only show the active outlet's transactions (`getTransactionsForPrint`). Locally Chromium comes from `PUPPETEER_EXECUTABLE_PATH` or full `puppeteer`'s cached Chrome. `vercel.json`, `@sparticuz/chromium` and `outputFileTracingIncludes` are left over from Vercel.
 
-**Shipment-service proxy.** `app/api/shipment/*` route handlers keep `SHIPMENT_API_KEY` on the server (sent as the `X-API-KEY` header). `area` proxies area search. `cancel/[id]` voids an AWB using `transactions.shipping_ref1` (the transaction must belong to the active outlet) and then marks the transaction cancelled. Client code calls these routes, never the shipment-service itself (see `cancelShipment` in `lib/transactions/mutations.ts`).
+**Shipping routes (Autolaris H2H).** `lib/autolaris.ts` is identical to `panel`'s copy.
+- `app/api/shipment/area` searches districts in the local `autolaris_distrik` table.
+- `cancel/[id]` calls `/api/h2h/cancel` with `transactions.al_transaction_id` and the outlet's API key, then marks the transaction cancelled. The transaction must belong to the active outlet.
+- Old AutoKirim orders (only `shipping_ref1`, no `al_transaction_id`) are refused with a message; cancel those in AutoKirim itself.
+- Order lists show the destination district as `destination_area`: from `autolaris_distrik` for AL orders, from `autokirim_area` for old ones.
+- Client code calls these routes only (`cancelShipment` in `lib/transactions/mutations.ts`).
 
 **UI.** shadcn/ui (`components.json`: style `radix-maia`, hugeicons icon library, Tailwind v4 via `app/globals.css`) with primitives in `components/ui/`. Tables use TanStack Table with a `page.tsx` / `columns.tsx` / `data-table.tsx` trio per route (`app/kasir/penjualan`, `app/kasir/order-web`). `/` redirects to `/kasir`. `app/kasir/layout.tsx` enforces the active outlet and renders the sidebar.
 

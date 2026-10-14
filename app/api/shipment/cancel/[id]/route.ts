@@ -2,32 +2,19 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 import { requireOutletAccess } from "@/lib/access"
+import { cancelAlOrder, getAlApiKey } from "@/lib/autolaris"
 import { execute, queryOne } from "@/lib/db"
 
-// Batalkan / void pengiriman (AWB) untuk satu transaksi.
-//
-// API key shipment-service WAJIB tetap di server — route handler ini jadi proxy:
-// baca shipping_ref1 (referensi AutoKirim yang disimpan saat buat AWB), panggil
-// shipment-service POST /api/v1/shipment/cancel, lalu tandai transaksi cancelled.
-//
-// Hanya dipakai dari dashboard admin (gudang-import), bukan storefront.
+// Batalkan pengiriman satu transaksi web lewat Autolaris H2H POST /api/h2h/cancel
+// (transaction_id dari /submit, kolom al_transaction_id), lalu tandai
+// transaksi cancelled. API key outlet tetap di server.
 
 type TrxRow = {
   id: string
   awb: string | null
+  al_transaction_id: string | null
   shipping_ref1: number | null
   status: string | null
-}
-
-function shipmentConfig() {
-  const baseUrl = process.env.SHIPMENT_SERVICE_URL
-  const apiKey = process.env.SHIPMENT_API_KEY
-
-  if (!baseUrl || !apiKey) {
-    throw new Error("SHIPMENT_SERVICE_URL / SHIPMENT_API_KEY belum diset di env")
-  }
-
-  return { baseUrl: baseUrl.replace(/\/$/, ""), apiKey }
 }
 
 export async function POST(
@@ -39,7 +26,7 @@ export async function POST(
   const { activeOutlet } = await requireOutletAccess()
 
   const trx = await queryOne<TrxRow>(
-    `SELECT id, awb, shipping_ref1, status
+    `SELECT id, awb, al_transaction_id, shipping_ref1, status
      FROM transactions
      WHERE id = ? AND outlet_id = ?`,
     [id, activeOutlet.id]
@@ -52,81 +39,59 @@ export async function POST(
     )
   }
 
-  // Tidak ada AWB → tidak ada yang perlu dibatalkan di AutoKirim. Idempoten:
-  // langsung tandai cancelled saja.
-  if (!trx.awb && !trx.shipping_ref1) {
+  if (trx.status === "cancelled") {
     return Response.json(
-      { success: false, message: "Transaksi belum punya pengiriman (AWB)" },
+      { success: false, message: "Transaksi sudah dibatalkan" },
       { status: 422 }
     )
   }
 
-  if (!trx.shipping_ref1) {
+  if (!trx.al_transaction_id) {
     return Response.json(
       {
         success: false,
-        message: "Referensi pengiriman (reff_1) tidak tersedia untuk dibatalkan",
+        message: trx.shipping_ref1
+          ? "Pengiriman ini dibuat lewat AutoKirim (sistem lama); batalkan langsung di AutoKirim"
+          : "Transaksi belum punya pengiriman Autolaris",
       },
       { status: 422 }
     )
   }
 
-  // Panggil shipment-service untuk void AWB di AutoKirim.
-  let result: { baseUrl: string; apiKey: string }
-  try {
-    result = shipmentConfig()
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Konfigurasi shipment tidak lengkap"
-    return Response.json({ success: false, message }, { status: 500 })
+  const apiKey = await getAlApiKey(activeOutlet.id)
+  if (!apiKey) {
+    return Response.json(
+      { success: false, message: "API key Autolaris outlet belum diatur (Pengaturan > Metode Order)" },
+      { status: 500 }
+    )
   }
 
-  let res: Response
-  try {
-    res = await fetch(`${result.baseUrl}/api/v1/shipment/cancel`, {
-      method: "POST",
-      headers: {
-        "X-API-KEY": result.apiKey,
-        "Content-Type": "application/json",
-      },
-      cache: "no-store",
-      body: JSON.stringify({ reff_1: trx.shipping_ref1 }),
-    })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Gagal menghubungi shipment-service"
-    return Response.json({ success: false, message }, { status: 502 })
+  const result = await cancelAlOrder(apiKey, trx.al_transaction_id)
+
+  if (result.rc !== "00") {
+    return Response.json(
+      { success: false, message: `Pembatalan ditolak Autolaris: ${result.ket || "kesalahan tidak diketahui"}` },
+      { status: 422 }
+    )
   }
 
-  const json = await res.json().catch(() => null)
-
-  if (!res.ok || !json?.success) {
-    // 400 = validasi, 422 = AutoKirim menolak (rc != "00"), 502 = transport.
-    const message =
-      json?.errors?.message ||
-      json?.message ||
-      `pembatalan pengiriman gagal (${res.status})`
-    return Response.json({ success: false, message }, { status: res.status || 502 })
-  }
-
-  // Sukses void → bersihkan AWB & referensi, tandai cancelled. Simpan agar tidak
-  // bisa dibatalkan/cetak ulang dan supaya status konsisten dengan AutoKirim.
+  // Sukses → tandai cancelled dan lepas AWB supaya tidak bisa dicetak ulang.
   try {
     await execute(
       `UPDATE transactions
        SET status = 'cancelled',
            awb = NULL,
-           shipping_ref1 = NULL,
-           shipping_ref2 = NULL,
-           shipping_ref3 = NULL,
            shipping_order_status = 'cancelled',
+           cancelled_at = CURRENT_TIMESTAMP(6),
            updated_at = CURRENT_TIMESTAMP(6)
        WHERE id = ?`,
       [id]
     )
   } catch (updateErr) {
-    // AWB sudah dibatalkan di AutoKirim tapi gagal disimpan — log keras agar bisa
+    // Sudah dibatalkan di Autolaris tapi gagal disimpan — log keras agar bisa
     // direkonsiliasi manual (jangan batalkan ulang).
     console.error(
-      `cancelShipment: AWB trx ${id} dibatalkan tapi gagal update database:`,
+      `cancelShipment: trx ${id} dibatalkan di Autolaris tapi gagal update database:`,
       updateErr instanceof Error ? updateErr.message : updateErr
     )
     return Response.json(

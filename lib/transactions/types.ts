@@ -66,6 +66,8 @@ export type Transaction = {
   awb: string | null
   awb_created_at: string | null
   shipping_ref1: number | null
+  al_transaction_id: string | null
+  payment_channel: string | null
 
   buyer_name: string | null
   buyer_phone: string | null
@@ -76,7 +78,8 @@ export type Transaction = {
   shipping_regency_name: string | null
   shipping_province_name: string | null
 
-  autokirim_area: TransactionArea | null
+  // Kecamatan tujuan (autolaris_distrik untuk order AL, autokirim_area untuk order lama).
+  destination_area: TransactionArea | null
   products: TransactionProduct[]
 
   subtotal: number
@@ -103,7 +106,7 @@ export type Transaction = {
 }
 
 export type TransactionArea = {
-  district_id: number
+  district_id: number | string
   district_name: string
   regency_name: string
   province_name: string

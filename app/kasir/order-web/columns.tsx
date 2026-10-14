@@ -370,7 +370,7 @@ export function getColumns(
     const phone =
       row.original.buyer_phone?.toLowerCase() || ""
 
-    const area = row.original.autokirim_area
+    const area = row.original.destination_area
 
     const district =
       area?.district_name?.toLowerCase() || ""
@@ -392,7 +392,7 @@ export function getColumns(
 
   cell: ({ row }) => {
     const data = row.original
-    const area = data.autokirim_area
+    const area = data.destination_area
 
     return (
       <div className="min-w-[240px] space-y-1.5">

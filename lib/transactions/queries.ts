@@ -1,5 +1,6 @@
 import "server-only"
 
+import { getAlAreasByIds } from "@/lib/autolaris"
 import { parseJson, query, queryOne, type Row } from "@/lib/db"
 import { requireOutletAccess } from "@/lib/outlet"
 
@@ -9,7 +10,61 @@ import type {
   TransactionProduct,
 } from "./types"
 
-type TransactionRow = Omit<Transaction, "autokirim_area">
+type TransactionRow = Omit<Transaction, "destination_area">
+
+/*
+ * Nama kecamatan tujuan. Order Autolaris H2H (al_transaction_id terisi)
+ * menyimpan id_distrik AL di shipping_destination_id; order lama dari
+ * AutoKirim menyimpan district_id tabel autokirim_area.
+ */
+async function attachDestinationAreas(
+  transactions: TransactionRow[]
+): Promise<Transaction[]> {
+  const isAl = (t: TransactionRow) => Boolean(t.al_transaction_id)
+  const idsOf = (rows: TransactionRow[]) => [
+    ...new Set(
+      rows
+        .map((t) => t.shipping_destination_id)
+        .filter((id): id is number => id !== null && id !== undefined)
+    ),
+  ]
+
+  const alIds = idsOf(transactions.filter(isAl))
+  const legacyIds = idsOf(transactions.filter((t) => !isAl(t)))
+
+  const [alAreas, legacyAreas] = await Promise.all([
+    getAlAreasByIds(alIds),
+    legacyIds.length
+      ? query<TransactionArea>(
+          `SELECT district_id, district_name, regency_name, province_name, postcode
+           FROM autokirim_area
+           WHERE district_id IN (?)`,
+          [legacyIds]
+        )
+      : Promise.resolve([] as TransactionArea[]),
+  ])
+
+  const legacyMap = new Map(
+    legacyAreas.map((area) => [String(area.district_id), area])
+  )
+
+  return transactions.map((transaction) => {
+    const id = transaction.shipping_destination_id
+    const key = id !== null && id !== undefined ? String(id) : null
+    const alArea = key && isAl(transaction) ? alAreas.get(key) : undefined
+
+    return {
+      ...transaction,
+      destination_area: !key
+        ? null
+        : alArea
+          ? { ...alArea, postcode: null }
+          : isAl(transaction)
+            ? null
+            : legacyMap.get(key) ?? null,
+    }
+  })
+}
 
 /*
  * Kolom JSON `products` disimpan sebagai teks di MariaDB.
@@ -49,37 +104,8 @@ export async function getTransactions(
     throw error
   }
 
-  const destinationIds = [
-    ...new Set(
-      transactions
-        .map(
-          (transaction) =>
-            transaction.shipping_destination_id
-        )
-        .filter(
-          (id): id is number =>
-            id !== null &&
-            id !== undefined
-        )
-    ),
-  ]
-
-  if (destinationIds.length === 0) {
-    return transactions.map((transaction) => ({
-      ...transaction,
-      autokirim_area: null,
-    }))
-  }
-
-  let areas: TransactionArea[]
-
   try {
-    areas = await query<TransactionArea>(
-      `SELECT district_id, district_name, regency_name, province_name, postcode
-       FROM autokirim_area
-       WHERE district_id IN (?)`,
-      [destinationIds]
-    )
+    return await attachDestinationAreas(transactions)
   } catch (error) {
     console.error(
       "[getTransactions] area error:",
@@ -88,31 +114,6 @@ export async function getTransactions(
 
     throw error
   }
-
-  const areaMap = new Map(
-    areas.map((area) => [
-      String(area.district_id),
-      area,
-    ])
-  )
-
-  return transactions.map((transaction): Transaction => {
-    const destinationId =
-      transaction.shipping_destination_id
-
-    const area =
-      destinationId !== null &&
-      destinationId !== undefined
-        ? areaMap.get(
-            String(destinationId)
-          ) ?? null
-        : null
-
-    return {
-      ...transaction,
-      autokirim_area: area,
-    }
-  })
 }
 
 export async function getTransactionById(
@@ -129,26 +130,11 @@ export async function getTransactionById(
     throw new Error("Transaksi tidak ditemukan")
   }
 
-  const data = normalizeTransaction(row)
+  const [transaction] = await attachDestinationAreas([
+    normalizeTransaction(row),
+  ])
 
-  let autokirim_area: TransactionArea | null = null
-
-  if (
-    data.shipping_destination_id !== null &&
-    data.shipping_destination_id !== undefined
-  ) {
-    autokirim_area = await queryOne<TransactionArea>(
-      `SELECT district_id, district_name, regency_name, province_name, postcode
-       FROM autokirim_area
-       WHERE district_id = ?`,
-      [data.shipping_destination_id]
-    )
-  }
-
-  return {
-    ...data,
-    autokirim_area,
-  }
+  return transaction
 }
 
 /*
