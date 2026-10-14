@@ -20,7 +20,7 @@ npm run lint       # eslint (flat config: next core-web-vitals + typescript)
 npx tsc --noEmit   # type-check; there is no dedicated script
 ```
 
-There is no test suite. This directory is not a git repo.
+There is no test suite. Git remote: `git@github.com:ijarviz/pusat-belanja-kasir.git` (branch `main`).
 
 Env vars (`.env*` is gitignored): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SHIPMENT_SERVICE_URL`, `SHIPMENT_API_KEY` (server-only, never expose to the client), plus optional `NEXT_PUBLIC_APP_URL`, `PUPPETEER_EXECUTABLE_PATH`, `NEXT_PUBLIC_ENABLE_SIGNUP` and `NEXT_PUBLIC_ENABLE_FORGOT_PASSWORD`. If the Supabase vars are missing, `lib/supabase/proxy.ts` skips the auth check (`hasEnvVars`).
 
