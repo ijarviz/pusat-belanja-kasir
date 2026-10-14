@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`kasir` (package name `kasir-gudang-import`) is the **point-of-sale (kasir) app for Pusat Belanja outlets**. It is **not** one of the CodeIgniter/Autolaris Shop API storefronts described in `/autolaris/websites/CLAUDE.md`. It is a Next.js 16 (App Router, React 19) + Supabase app, deployed on Vercel (see `vercel.json`). The catalog, transactions, stock, vouchers and printers all live in **Supabase Postgres**. Shipping goes through a separate **shipment-service** (AutoKirim). It shares that Supabase DB with a sibling admin dashboard ("gudang-import") and a storefront. Those sit outside this directory, so the schema and RPCs are defined somewhere else.
+`kasir` (package name `kasir-gudang-import`) is the **point-of-sale (kasir) app for Pusat Belanja outlets**. It is **not** one of the CodeIgniter/Autolaris Shop API storefronts described in `/autolaris/websites/CLAUDE.md`. It is a Next.js 16 (App Router, React 19) + Supabase app, deployed on Vercel (see `vercel.json`). The catalog, transactions, stock, vouchers and printers all live in **Supabase Postgres**. Shipping goes through a separate **shipment-service** (AutoKirim). It shares that Supabase DB with two sibling apps: the admin dashboard `../panel/` ("gudang-import") and the storefront `../store/`. See `../CLAUDE.md` for how the three fit together. None of the three repos defines the schema or RPCs; those live only in the Supabase project.
 
 `README.md` is still the stock create-next-app README. UI copy, comments and route names are in Indonesian (`penjualan` = sales, `cek-harga` = price check, `pengaturan` = settings, `nonaktif` = inactive).
 
