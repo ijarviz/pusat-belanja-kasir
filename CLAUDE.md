@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `kasir` (package name `kasir-gudang-import`) is the **point-of-sale (kasir) app for Pusat Belanja outlets**. It is **not** one of the CodeIgniter/Autolaris Shop API storefronts described in `/autolaris/websites/CLAUDE.md`. It is a Next.js 16 (App Router, React 19) app.
 
-**Since 2026-10-14 its data lives in this server's MariaDB (database `pusatbelanja`), not Supabase.** The schema, procedures and triggers are in `../docs/db-pusatbelanja-mariadb.sql` and `../docs/db-function-pusatbelanja-mariadb.sql`. It shares that database with the admin dashboard `../panel/` ("gudang-import"), which moved first and whose data layer this app reuses. The storefront `../store/` is still on Supabase, so web orders and the storefront catalog are split from this app until it moves too. See `../CLAUDE.md` for how the three fit together. Shipping goes through a separate **shipment-service** (AutoKirim).
+**Since 2026-10-14 its data lives in this server's MariaDB (database `pusatbelanja`), not Supabase.** The schema, procedures and triggers are in `../docs/db-pusatbelanja-mariadb.sql` and `../docs/db-function-pusatbelanja-mariadb.sql`. It shares that database with the admin dashboard `../panel/` ("gudang-import"), which moved first and whose data layer this app reuses, and with the storefront `../store/`. The Supabase data was imported on 2026-10-14 (`../docs/import/`). See `../CLAUDE.md` for how the three fit together. Shipping goes through a separate **shipment-service** (AutoKirim).
 
 Users, passwords and outlet memberships are managed in `panel` (Akses Tim page). This app only logs users in.
 
@@ -32,7 +32,7 @@ Env vars (`.env*` is gitignored; `.env.local` on this server already holds local
 
 - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`: MariaDB. The same credentials are in `../.db-credentials`.
 - `AUTH_SECRET`: signs the session cookie, at least 32 characters. Changing it logs everyone out.
-- `UPLOAD_PUBLIC_URL`: where `panel` serves uploaded images. In production it must be `panel`'s absolute URL (e.g. `https://panel.example/uploads`) so `next/image` allows that host.
+- `UPLOAD_DIR` / `UPLOAD_PUBLIC_URL`: images uploaded by `panel`. Image URLs in the DB are relative (`/uploads/<bucket>/<file>`), and `app/uploads/[bucket]/[file]` (a copy of `store`'s route) serves them from the same disk. Keep `UPLOAD_PUBLIC_URL` unset or `/uploads`; an absolute host is only added to `next/image` remote patterns.
 - `SHIPMENT_SERVICE_URL`, `SHIPMENT_API_KEY`: server-only, never expose to the client.
 - Optional: `NEXT_PUBLIC_APP_URL`, `PUPPETEER_EXECUTABLE_PATH`, `DB_POOL_SIZE`.
 
