@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { getTransactionsForPrint } from "@/lib/transactions/queries"
 import { notFound } from "next/navigation"
 
 import ShippingLabel from "@/components/shipping-label"
@@ -10,13 +10,7 @@ export default async function PrintPage({
 }) {
   const { id } = await params
 
-  const supabase = await createClient()
-
-  const { data: trx } = await supabase
-    .from("transactions")
-    .select("*")
-    .eq("id", id)
-    .single()
+  const [trx] = await getTransactionsForPrint([id])
 
   if (!trx) {
     notFound()

@@ -23,7 +23,10 @@ import type {
   ReceiptData,
 } from "@/lib/transactions/receipt"
 
-import { createClient } from "@/lib/supabase/client"
+import {
+  getDefaultPrinterAction,
+  getReceiptOutletAction,
+} from "./actions"
 
 type PrinterConfig = {
   id: string
@@ -51,42 +54,11 @@ type PrinterConfig = {
 async function getDefaultPrinter(
   outletId: string
 ): Promise<PrinterConfig | null> {
-  const supabase = createClient()
+  let data
 
-  const {
-    data,
-    error,
-  } = await supabase
-    .from("printer_devices")
-    .select(`
-      id,
-      name,
-      connection_type,
-      is_default,
-
-      bluetooth_device_name,
-      bluetooth_device_id,
-      bluetooth_service_uuid,
-      bluetooth_characteristic_uuid,
-
-      usb_vendor_id,
-      usb_product_id,
-      usb_serial_number,
-
-      paper_width,
-      printer_model
-    `)
-    .eq(
-      "outlet_id",
-      outletId
-    )
-    .eq(
-      "is_default",
-      true
-    )
-    .maybeSingle()
-
-  if (error) {
+  try {
+    data = await getDefaultPrinterAction(outletId)
+  } catch (error) {
     console.error(
       "[Print] Gagal mengambil printer default:",
       error
@@ -107,30 +79,17 @@ async function getDefaultPrinter(
 async function buildTransactionReceipt(
   data: Transaction
 ) {
-  const supabase = createClient()
-
   // =====================================
   // AMBIL OUTLET ASLI
   // =====================================
 
-  const {
-    data: outlet,
-    error: outletError,
-  } = await supabase
-    .from("outlets")
-    .select(`
-      id,
-      name,
-      address,
-      image_url
-    `)
-    .eq(
-      "id",
-      data.outlet_id
-    )
-    .single()
+  let outlet
 
-  if (outletError) {
+  try {
+    outlet = data.outlet_id
+      ? await getReceiptOutletAction(data.outlet_id)
+      : null
+  } catch (outletError) {
     console.error(
       "[Print] Gagal mengambil outlet:",
       outletError

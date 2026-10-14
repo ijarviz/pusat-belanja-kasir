@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { getTransactionsForPrint } from "@/lib/transactions/queries"
 import ShippingLabel from "@/components/shipping-label"
 
 export default async function BulkPrintPage({
@@ -15,14 +15,8 @@ export default async function BulkPrintPage({
     .split(",")
     .filter(Boolean)
 
-  const supabase = await createClient()
-
-  const { data } = await supabase
-    .from("transactions")
-    .select("*")
-    .in("id", trxIds)
-
-  const transactions = data ?? []
+  const transactions =
+    await getTransactionsForPrint(trxIds)
 
   return (
     <div>

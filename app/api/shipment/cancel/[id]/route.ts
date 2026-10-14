@@ -1,7 +1,8 @@
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-import { createClient } from "@/lib/supabase/server"
+import { requireOutletAccess } from "@/lib/access"
+import { execute, queryOne } from "@/lib/db"
 
 // Batalkan / void pengiriman (AWB) untuk satu transaksi.
 //
@@ -35,15 +36,16 @@ export async function POST(
 ) {
   const { id } = await params
 
-  const supabase = await createClient()
+  const { activeOutlet } = await requireOutletAccess()
 
-  const { data: trx, error } = await supabase
-    .from("transactions")
-    .select("id, awb, shipping_ref1, status")
-    .eq("id", id)
-    .single<TrxRow>()
+  const trx = await queryOne<TrxRow>(
+    `SELECT id, awb, shipping_ref1, status
+     FROM transactions
+     WHERE id = ? AND outlet_id = ?`,
+    [id, activeOutlet.id]
+  )
 
-  if (error || !trx) {
+  if (!trx) {
     return Response.json(
       { success: false, message: "Transaksi tidak ditemukan" },
       { status: 404 }
@@ -107,25 +109,25 @@ export async function POST(
 
   // Sukses void → bersihkan AWB & referensi, tandai cancelled. Simpan agar tidak
   // bisa dibatalkan/cetak ulang dan supaya status konsisten dengan AutoKirim.
-  const { error: updateErr } = await supabase
-    .from("transactions")
-    .update({
-      status: "cancelled",
-      awb: null,
-      shipping_ref1: null,
-      shipping_ref2: null,
-      shipping_ref3: null,
-      shipping_order_status: "cancelled",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-
-  if (updateErr) {
+  try {
+    await execute(
+      `UPDATE transactions
+       SET status = 'cancelled',
+           awb = NULL,
+           shipping_ref1 = NULL,
+           shipping_ref2 = NULL,
+           shipping_ref3 = NULL,
+           shipping_order_status = 'cancelled',
+           updated_at = CURRENT_TIMESTAMP(6)
+       WHERE id = ?`,
+      [id]
+    )
+  } catch (updateErr) {
     // AWB sudah dibatalkan di AutoKirim tapi gagal disimpan — log keras agar bisa
     // direkonsiliasi manual (jangan batalkan ulang).
     console.error(
-      `cancelShipment: AWB trx ${id} dibatalkan tapi gagal update Supabase:`,
-      updateErr.message
+      `cancelShipment: AWB trx ${id} dibatalkan tapi gagal update database:`,
+      updateErr instanceof Error ? updateErr.message : updateErr
     )
     return Response.json(
       { success: false, message: "Pengiriman dibatalkan tapi gagal disimpan" },

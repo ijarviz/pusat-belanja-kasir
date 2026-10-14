@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Cookies from "js-cookie"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import { logoutAction } from "@/lib/auth-actions"
 
 type Outlet = {
   id: string
@@ -28,9 +28,7 @@ export default function WelcomeOutletForm({
   )
 
   const handleLogout = async () => {
-    const supabase = createClient()
-
-    await supabase.auth.signOut()
+    await logoutAction()
 
     router.push("/auth/login")
 }

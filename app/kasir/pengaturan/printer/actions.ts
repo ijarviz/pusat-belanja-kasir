@@ -1,8 +1,85 @@
 "use server"
 
+import { randomUUID } from "node:crypto"
+
 import { revalidatePath } from "next/cache"
 
-import { getActiveOutlet } from "@/lib/outlet"
+import { execute, queryOne } from "@/lib/db"
+import { requireOutletAccess } from "@/lib/outlet"
+
+type OutletUser = {
+  id: string
+  role: string
+  status: string
+}
+
+const PRINTER_COLUMNS = `
+  id,
+  name,
+  connection_type,
+  is_default,
+  bluetooth_device_name,
+  bluetooth_device_id,
+  bluetooth_service_uuid,
+  bluetooth_characteristic_uuid,
+  usb_vendor_id,
+  usb_product_id,
+  usb_serial_number,
+  paper_width,
+  printer_model
+`
+
+/*
+ * Membership aktif user di outlet aktif. Printer disimpan per
+ * membership (outlet_user_id), bukan per outlet.
+ */
+async function getActiveOutletUser(context: string) {
+  const { user, activeOutlet } = await requireOutletAccess()
+
+  try {
+    const outletUser = await queryOne<OutletUser>(
+      `SELECT id, role, status
+       FROM outlet_users
+       WHERE user_id = ? AND outlet_id = ? AND status = 'active'`,
+      [user.id, activeOutlet.id]
+    )
+
+    return { activeOutlet, outletUser, error: null }
+  } catch (error) {
+    console.error(`[${context}] Outlet user error:`, error)
+    return { activeOutlet, outletUser: null, error }
+  }
+}
+
+/*
+ * Printer pertama otomatis menjadi default; kalau user memilih
+ * printer baru sebagai default, default lama dilepas dulu.
+ */
+async function resolveDefaultFlag(
+  outletId: string,
+  outletUserId: string,
+  isDefault: boolean
+) {
+  if (isDefault) {
+    await execute(
+      `UPDATE printer_devices
+       SET is_default = FALSE
+       WHERE outlet_id = ? AND outlet_user_id = ? AND is_default = TRUE`,
+      [outletId, outletUserId]
+    )
+
+    return true
+  }
+
+  const existingDefault = await queryOne(
+    `SELECT id FROM printer_devices
+     WHERE outlet_id = ? AND outlet_user_id = ? AND is_default = TRUE
+     LIMIT 1`,
+    [outletId, outletUserId]
+  )
+
+  return !existingDefault
+}
 
 type SaveUsbPrinterInput = {
   name: string
@@ -17,12 +94,6 @@ type SaveUsbPrinterInput = {
 export async function saveUsbPrinterAction(
   input: SaveUsbPrinterInput
 ) {
-  const {
-    supabase,
-    user,
-    activeOutlet,
-  } = await getActiveOutlet()
-
   const {
     name,
     vendorId,
@@ -61,156 +132,66 @@ export async function saveUsbPrinterAction(
     }
   }
 
-  const { data: outletUser, error: outletUserError } =
-    await supabase
-      .from("outlet_users")
-      .select("id, role, status")
-      .eq("user_id", user.id)
-      .eq("outlet_id", activeOutlet.id)
-      .eq("status", "active")
-      .maybeSingle()
+  const { activeOutlet, outletUser, error } =
+    await getActiveOutletUser("saveUsbPrinterAction")
 
-  if (outletUserError) {
-    console.error(
-      "[saveUsbPrinterAction] Outlet user error:",
-      outletUserError
-    )
-
+  if (error) {
     return {
       success: false,
-      error:
-        "Gagal memeriksa akses outlet.",
+      error: "Gagal memeriksa akses outlet.",
     }
   }
 
   if (!outletUser) {
     return {
       success: false,
-      error:
-        "Anda tidak memiliki akses aktif ke outlet ini.",
+      error: "Anda tidak memiliki akses aktif ke outlet ini.",
     }
   }
 
-  /**
-   * Kalau user memilih printer sebagai default,
-   * lepaskan default yang lama terlebih dahulu.
-   */
-  if (isDefault) {
-    const { error: clearDefaultError } =
-      await supabase
-        .from("printer_devices")
-        .update({
-          is_default: false,
-        })
-        .eq(
-          "outlet_id",
-          activeOutlet.id
-        )
-        .eq(
-          "outlet_user_id",
-          outletUser.id
-        )
-        .eq(
-          "is_default",
-          true
-        )
+  let finalIsDefault: boolean
 
-    if (clearDefaultError) {
-      console.error(
-        "[saveUsbPrinterAction] Clear default error:",
-        clearDefaultError
-      )
+  try {
+    finalIsDefault = await resolveDefaultFlag(
+      activeOutlet.id,
+      outletUser.id,
+      isDefault
+    )
+  } catch (defaultError) {
+    console.error(
+      "[saveUsbPrinterAction] Default printer error:",
+      defaultError
+    )
 
-      return {
-        success: false,
-        error:
-          "Gagal mengatur printer default.",
-      }
+    return {
+      success: false,
+      error: "Gagal mengatur printer default.",
     }
   }
 
-  /**
-   * Kalau belum ada printer default,
-   * printer pertama otomatis menjadi default.
-   */
-  let finalIsDefault = isDefault
+  const printerId = randomUUID()
 
-  if (!isDefault) {
-    const { data: existingDefault, error } =
-      await supabase
-        .from("printer_devices")
-        .select("id")
-        .eq(
-          "outlet_id",
-          activeOutlet.id
-        )
-        .eq(
-          "outlet_user_id",
-          outletUser.id
-        )
-        .eq(
-          "is_default",
-          true
-        )
-        .maybeSingle()
-
-    if (error) {
-      console.error(
-        "[saveUsbPrinterAction] Check default error:",
-        error
-      )
-
-      return {
-        success: false,
-        error:
-          "Gagal memeriksa printer default.",
-      }
-    }
-
-    if (!existingDefault) {
-      finalIsDefault = true
-    }
-  }
-
-  const { data: printer, error: insertError } =
-    await supabase
-      .from("printer_devices")
-      .insert({
-        outlet_id: activeOutlet.id,
-        outlet_user_id: outletUser.id,
-
-        name: name.trim(),
-
-        connection_type: "usb",
-
-        is_default: finalIsDefault,
-
-        usb_vendor_id: vendorId,
-        usb_product_id: productId,
-        usb_serial_number:
-          serialNumber?.trim() || null,
-
-        paper_width: paperWidth,
-
-        printer_model:
-          printerModel?.trim() || null,
-      })
-      .select(
-        `
-        id,
-        name,
-        connection_type,
-        is_default,
-        usb_vendor_id,
-        usb_product_id,
-        usb_serial_number,
-        paper_width,
-        printer_model
-        `
-      )
-      .single()
-
-  if (insertError) {
+  try {
+    await execute(
+      `INSERT INTO printer_devices (
+         id, outlet_id, outlet_user_id, name, connection_type, is_default,
+         usb_vendor_id, usb_product_id, usb_serial_number,
+         paper_width, printer_model
+       ) VALUES (?, ?, ?, ?, 'usb', ?, ?, ?, ?, ?, ?)`,
+      [
+        printerId,
+        activeOutlet.id,
+        outletUser.id,
+        name.trim(),
+        finalIsDefault,
+        vendorId,
+        productId,
+        serialNumber?.trim() || null,
+        paperWidth,
+        printerModel?.trim() || null,
+      ]
+    )
+  } catch (insertError) {
     console.error(
       "[saveUsbPrinterAction] Insert error:",
       insertError
@@ -218,10 +199,14 @@ export async function saveUsbPrinterAction(
 
     return {
       success: false,
-      error:
-        "Gagal menyimpan printer.",
+      error: "Gagal menyimpan printer.",
     }
   }
+
+  const printer = await queryOne(
+    `SELECT ${PRINTER_COLUMNS} FROM printer_devices WHERE id = ?`,
+    [printerId]
+  )
 
   revalidatePath(
     "/pengaturan/printer"
@@ -247,12 +232,6 @@ type SaveBluetoothPrinterInput = {
 export async function saveBluetoothPrinterAction(
   input: SaveBluetoothPrinterInput
 ) {
-  const {
-    supabase,
-    user,
-    activeOutlet,
-  } = await getActiveOutlet()
-
   const {
     name,
     deviceName,
@@ -286,174 +265,68 @@ export async function saveBluetoothPrinterAction(
     }
   }
 
-  const {
-    data: outletUser,
-    error: outletUserError,
-  } = await supabase
-    .from("outlet_users")
-    .select("id, role, status")
-    .eq("user_id", user.id)
-    .eq("outlet_id", activeOutlet.id)
-    .eq("status", "active")
-    .maybeSingle()
+  const { activeOutlet, outletUser, error } =
+    await getActiveOutletUser("saveBluetoothPrinterAction")
 
-  if (outletUserError) {
-    console.error(
-      "[saveBluetoothPrinterAction] Outlet user error:",
-      outletUserError
-    )
-
+  if (error) {
     return {
       success: false,
-      error:
-        "Gagal memeriksa akses outlet.",
+      error: "Gagal memeriksa akses outlet.",
     }
   }
 
   if (!outletUser) {
     return {
       success: false,
-      error:
-        "Anda tidak memiliki akses aktif ke outlet ini.",
+      error: "Anda tidak memiliki akses aktif ke outlet ini.",
     }
   }
 
-  /**
-   * Kalau user memilih printer sebagai default,
-   * lepaskan default yang lama terlebih dahulu.
-   */
-  if (isDefault) {
-    const {
-      error: clearDefaultError,
-    } = await supabase
-      .from("printer_devices")
-      .update({
-        is_default: false,
-      })
-      .eq(
-        "outlet_id",
-        activeOutlet.id
-      )
-      .eq(
-        "outlet_user_id",
-        outletUser.id
-      )
-      .eq(
-        "is_default",
-        true
-      )
+  let finalIsDefault: boolean
 
-    if (clearDefaultError) {
-      console.error(
-        "[saveBluetoothPrinterAction] Clear default error:",
-        clearDefaultError
-      )
-
-      return {
-        success: false,
-        error:
-          "Gagal mengatur printer default.",
-      }
-    }
-  }
-
-  /**
-   * Kalau belum ada printer default,
-   * printer pertama otomatis menjadi default.
-   */
-  let finalIsDefault = isDefault
-
-  if (!isDefault) {
-    const {
-      data: existingDefault,
-      error,
-    } = await supabase
-      .from("printer_devices")
-      .select("id")
-      .eq(
-        "outlet_id",
-        activeOutlet.id
-      )
-      .eq(
-        "outlet_user_id",
-        outletUser.id
-      )
-      .eq(
-        "is_default",
-        true
-      )
-      .maybeSingle()
-
-    if (error) {
-      console.error(
-        "[saveBluetoothPrinterAction] Check default error:",
-        error
-      )
-
-      return {
-        success: false,
-        error:
-          "Gagal memeriksa printer default.",
-      }
-    }
-
-    if (!existingDefault) {
-      finalIsDefault = true
-    }
-  }
-
-  const {
-    data: printer,
-    error: insertError,
-  } = await supabase
-    .from("printer_devices")
-    .insert({
-      outlet_id: activeOutlet.id,
-      outlet_user_id: outletUser.id,
-
-      name: name.trim(),
-
-      connection_type:
-        "bluetooth",
-
-      is_default:
-        finalIsDefault,
-
-      bluetooth_device_name:
-        deviceName?.trim() || null,
-
-      bluetooth_device_id:
-        deviceId.trim(),
-
-      bluetooth_service_uuid:
-        serviceUuid?.trim() || null,
-
-      bluetooth_characteristic_uuid:
-        characteristicUuid?.trim() || null,
-
-      paper_width:
-        paperWidth,
-
-      printer_model:
-        printerModel?.trim() || null,
-    })
-    .select(
-      `
-      id,
-      name,
-      connection_type,
-      is_default,
-      bluetooth_device_name,
-      bluetooth_device_id,
-      bluetooth_service_uuid,
-      bluetooth_characteristic_uuid,
-      paper_width,
-      printer_model
-      `
+  try {
+    finalIsDefault = await resolveDefaultFlag(
+      activeOutlet.id,
+      outletUser.id,
+      isDefault
     )
-    .single()
+  } catch (defaultError) {
+    console.error(
+      "[saveBluetoothPrinterAction] Default printer error:",
+      defaultError
+    )
 
-  if (insertError) {
+    return {
+      success: false,
+      error: "Gagal mengatur printer default.",
+    }
+  }
+
+  const printerId = randomUUID()
+
+  try {
+    await execute(
+      `INSERT INTO printer_devices (
+         id, outlet_id, outlet_user_id, name, connection_type, is_default,
+         bluetooth_device_name, bluetooth_device_id,
+         bluetooth_service_uuid, bluetooth_characteristic_uuid,
+         paper_width, printer_model
+       ) VALUES (?, ?, ?, ?, 'bluetooth', ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        printerId,
+        activeOutlet.id,
+        outletUser.id,
+        name.trim(),
+        finalIsDefault,
+        deviceName?.trim() || null,
+        deviceId.trim(),
+        serviceUuid?.trim() || null,
+        characteristicUuid?.trim() || null,
+        paperWidth,
+        printerModel?.trim() || null,
+      ]
+    )
+  } catch (insertError) {
     console.error(
       "[saveBluetoothPrinterAction] Insert error:",
       insertError
@@ -461,10 +334,14 @@ export async function saveBluetoothPrinterAction(
 
     return {
       success: false,
-      error:
-        "Gagal menyimpan printer.",
+      error: "Gagal menyimpan printer.",
     }
   }
+
+  const printer = await queryOne(
+    `SELECT ${PRINTER_COLUMNS} FROM printer_devices WHERE id = ?`,
+    [printerId]
+  )
 
   revalidatePath(
     "/pengaturan/printer"
@@ -486,30 +363,10 @@ export async function deletePrinterAction(
     }
   }
 
-  const {
-    supabase,
-    activeOutlet,
-    user,
-  } = await getActiveOutlet()
+  const { activeOutlet, outletUser, error } =
+    await getActiveOutletUser("deletePrinterAction")
 
-  // Cari outlet user yang aktif
-  const {
-    data: outletUser,
-    error: outletUserError,
-  } = await supabase
-    .from("outlet_users")
-    .select("id, role, status")
-    .eq("user_id", user.id)
-    .eq("outlet_id", activeOutlet.id)
-    .eq("status", "active")
-    .maybeSingle()
-
-  if (outletUserError) {
-    console.error(
-      "[deletePrinterAction] Outlet user error:",
-      outletUserError
-    )
-
+  if (error) {
     return {
       success: false,
       error: "Gagal memeriksa akses pengguna.",
@@ -524,23 +381,16 @@ export async function deletePrinterAction(
   }
 
   // Ambil printer yang akan dihapus
-  const {
-    data: printer,
-    error: printerError,
-  } = await supabase
-    .from("printer_devices")
-    .select(`
-      id,
-      outlet_id,
-      outlet_user_id,
-      is_default
-    `)
-    .eq("id", printerId)
-    .eq("outlet_id", activeOutlet.id)
-    .eq("outlet_user_id", outletUser.id)
-    .maybeSingle()
+  let printer: { id: string; is_default: boolean } | null
 
-  if (printerError) {
+  try {
+    printer = await queryOne(
+      `SELECT id, is_default
+       FROM printer_devices
+       WHERE id = ? AND outlet_id = ? AND outlet_user_id = ?`,
+      [printerId, activeOutlet.id, outletUser.id]
+    )
+  } catch (printerError) {
     console.error(
       "[deletePrinterAction] Printer lookup error:",
       printerError
@@ -560,16 +410,13 @@ export async function deletePrinterAction(
   }
 
   // Hapus printer
-  const {
-    error: deleteError,
-  } = await supabase
-    .from("printer_devices")
-    .delete()
-    .eq("id", printer.id)
-    .eq("outlet_id", activeOutlet.id)
-    .eq("outlet_user_id", outletUser.id)
-
-  if (deleteError) {
+  try {
+    await execute(
+      `DELETE FROM printer_devices
+       WHERE id = ? AND outlet_id = ? AND outlet_user_id = ?`,
+      [printer.id, activeOutlet.id, outletUser.id]
+    )
+  } catch (deleteError) {
     console.error(
       "[deletePrinterAction] Delete error:",
       deleteError
@@ -584,50 +431,20 @@ export async function deletePrinterAction(
   // Kalau printer yang dihapus adalah default,
   // pilih printer lain sebagai default.
   if (printer.is_default) {
-    const {
-      data: nextPrinter,
-      error: nextPrinterError,
-    } = await supabase
-      .from("printer_devices")
-      .select("id")
-      .eq(
-        "outlet_id",
-        activeOutlet.id
+    try {
+      await execute(
+        `UPDATE printer_devices
+         SET is_default = TRUE
+         WHERE outlet_id = ? AND outlet_user_id = ?
+         ORDER BY created_at ASC
+         LIMIT 1`,
+        [activeOutlet.id, outletUser.id]
       )
-      .eq(
-        "outlet_user_id",
-        outletUser.id
-      )
-      .order("created_at", {
-        ascending: true,
-      })
-      .limit(1)
-      .maybeSingle()
-
-    if (nextPrinterError) {
+    } catch (nextDefaultError) {
       console.error(
-        "[deletePrinterAction] Failed to find next default printer:",
-        nextPrinterError
+        "[deletePrinterAction] Failed to set next default:",
+        nextDefaultError
       )
-    } else if (nextPrinter) {
-      const {
-        error: updateDefaultError,
-      } = await supabase
-        .from("printer_devices")
-        .update({
-          is_default: true,
-        })
-        .eq(
-          "id",
-          nextPrinter.id
-        )
-
-      if (updateDefaultError) {
-        console.error(
-          "[deletePrinterAction] Failed to set next default:",
-          updateDefaultError
-        )
-      }
     }
   }
 
@@ -650,29 +467,10 @@ export async function setDefaultPrinterAction(
     }
   }
 
-  const {
-    supabase,
-    activeOutlet,
-    user,
-  } = await getActiveOutlet()
+  const { activeOutlet, outletUser, error } =
+    await getActiveOutletUser("setDefaultPrinterAction")
 
-  const {
-    data: outletUser,
-    error: outletUserError,
-  } = await supabase
-    .from("outlet_users")
-    .select("id, role, status")
-    .eq("user_id", user.id)
-    .eq("outlet_id", activeOutlet.id)
-    .eq("status", "active")
-    .maybeSingle()
-
-  if (outletUserError) {
-    console.error(
-      "[setDefaultPrinterAction] Outlet user error:",
-      outletUserError
-    )
-
+  if (error) {
     return {
       success: false,
       error: "Gagal memeriksa akses pengguna.",
@@ -686,6 +484,8 @@ export async function setDefaultPrinterAction(
     }
   }
 
+  // Sama seperti versi Supabase: hanya role "owner" (dan "admin",
+  // role yang tidak ada di enum) yang boleh mengganti default.
   if (
     !["owner", "admin"].includes(
       outletUser.role
@@ -697,18 +497,16 @@ export async function setDefaultPrinterAction(
     }
   }
 
-  const {
-    data: printer,
-    error: printerError,
-  } = await supabase
-    .from("printer_devices")
-    .select("id, name, is_default")
-    .eq("id", printerId)
-    .eq("outlet_id", activeOutlet.id)
-    .eq("outlet_user_id", outletUser.id)
-    .maybeSingle()
+  let printer: { id: string; is_default: boolean } | null
 
-  if (printerError) {
+  try {
+    printer = await queryOne(
+      `SELECT id, name, is_default
+       FROM printer_devices
+       WHERE id = ? AND outlet_id = ? AND outlet_user_id = ?`,
+      [printerId, activeOutlet.id, outletUser.id]
+    )
+  } catch (printerError) {
     console.error(
       "[setDefaultPrinterAction] Printer lookup error:",
       printerError
@@ -734,18 +532,14 @@ export async function setDefaultPrinterAction(
   }
 
   // Lepaskan default dari semua printer
-  const {
-    error: resetError,
-  } = await supabase
-    .from("printer_devices")
-    .update({
-      is_default: false,
-    })
-    .eq("outlet_id", activeOutlet.id)
-    .eq("outlet_user_id", outletUser.id)
-    .eq("is_default", true)
-
-  if (resetError) {
+  try {
+    await execute(
+      `UPDATE printer_devices
+       SET is_default = FALSE
+       WHERE outlet_id = ? AND outlet_user_id = ? AND is_default = TRUE`,
+      [activeOutlet.id, outletUser.id]
+    )
+  } catch (resetError) {
     console.error(
       "[setDefaultPrinterAction] Reset default error:",
       resetError
@@ -758,18 +552,14 @@ export async function setDefaultPrinterAction(
   }
 
   // Jadikan printer yang dipilih sebagai default
-  const {
-    error: updateError,
-  } = await supabase
-    .from("printer_devices")
-    .update({
-      is_default: true,
-    })
-    .eq("id", printer.id)
-    .eq("outlet_id", activeOutlet.id)
-    .eq("outlet_user_id", outletUser.id)
-
-  if (updateError) {
+  try {
+    await execute(
+      `UPDATE printer_devices
+       SET is_default = TRUE
+       WHERE id = ? AND outlet_id = ? AND outlet_user_id = ?`,
+      [printer.id, activeOutlet.id, outletUser.id]
+    )
+  } catch (updateError) {
     console.error(
       "[setDefaultPrinterAction] Set default error:",
       updateError

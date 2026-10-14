@@ -1,5 +1,16 @@
 import type { NextConfig } from "next";
 
+// Gambar produk diunggah lewat panel dan disajikan dari
+// UPLOAD_PUBLIC_URL panel. Kalau URL-nya absolut, host-nya harus
+// diizinkan untuk next/image.
+const uploadUrl = (() => {
+  try {
+    return new URL(process.env.UPLOAD_PUBLIC_URL ?? "");
+  } catch {
+    return null;
+  }
+})();
+
 const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "localhost",
@@ -17,11 +28,21 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
+      // URL gambar lama dari Supabase Storage (data hasil impor).
       {
         protocol: "https",
         hostname: "pxjztfezqoiacyyezete.supabase.co"
         // hostname: "**",
       },
+      ...(uploadUrl
+        ? [
+            {
+              protocol: uploadUrl.protocol.replace(":", "") as "http" | "https",
+              hostname: uploadUrl.hostname,
+              port: uploadUrl.port,
+            },
+          ]
+        : []),
     ],
   },
 };

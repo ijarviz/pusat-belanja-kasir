@@ -1,61 +1,50 @@
-import { createClient } from "@/lib/supabase/server"
-// import { getCurrentOutletCode } from "@/lib/current-outlet"
+import "server-only"
+
+import { query } from "@/lib/db"
 import { getCurrentOutletId } from "@/lib/current-outlet"
 
 import type { Product } from "./types"
+import { attachProductRelations } from "./rows"
 import { mapProduct } from "./transformers"
 
 export async function getProducts(): Promise<Product[]> {
-  const supabase = await createClient()
-  // const outletCode =
-    // await getCurrentOutletCode()
-  const outletId =
-    await getCurrentOutletId()
+  const outletId = await getCurrentOutletId()
 
-  const { data, error } = await supabase
-    .from("products")
-    .select(`
-      *,
-      category:categories!products_category_id_fkey(*),
-      variants: product_variants!product_id(*),
-      images: product_images!product_images_product_id_fkey(*)
-    `)
-    // .eq("outlet_code", outletCode)
-    .eq("outlet_id", outletId)
-    .is("deleted_at", null)
-    .order("created_at", {
-      ascending: false,
-    })
+  try {
+    const products = await query(
+      `SELECT * FROM products
+       WHERE outlet_id = ?
+         AND deleted_at IS NULL
+       ORDER BY created_at DESC`,
+      [outletId]
+    )
 
-  if (error) {
+    return (await attachProductRelations(products)).map(mapProduct)
+  } catch (error) {
     console.error(error)
     return []
   }
-
-  return (data ?? []).map(mapProduct)
 }
 
 export async function getProductById(
   id: string
 ): Promise<Product | null> {
-  const supabase = await createClient()
+  const outletId = await getCurrentOutletId()
 
-  const { data, error } = await supabase
-    .from("products")
-    .select(`
-      *,
-      category:categories!products_category_id_fkey(*),
-      variants: product_variants!product_id(*),
-      images: product_images!product_images_product_id_fkey(*)
-    `)
-    .eq("id", id)
-    .is("deleted_at", null)
-    .single()
+  try {
+    const products = await query(
+      `SELECT * FROM products
+       WHERE id = ?
+         AND outlet_id = ?
+         AND deleted_at IS NULL`,
+      [id, outletId]
+    )
 
-  if (error) {
+    const [product] = await attachProductRelations(products)
+
+    return product ? mapProduct(product) : null
+  } catch (error) {
     console.error(error)
     return null
   }
-
-  return mapProduct(data)
 }

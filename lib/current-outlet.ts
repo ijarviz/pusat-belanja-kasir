@@ -1,20 +1,14 @@
-// import { cookies } from "next/headers"
+import "server-only"
 
-// export async function getCurrentOutletCode() {
-//   const cookieStore = await cookies()
+import { requireOutletAccess } from "@/lib/outlet"
 
-//   return Number(
-//     cookieStore.get("outlet_code")?.value
-//   )
-// }
-
-import { cookies } from "next/headers"
-
+/*
+ * Id outlet aktif yang sudah divalidasi: user harus anggota aktif
+ * outlet itu. Dulu cookie outlet_id dibaca mentah dan RLS Supabase
+ * yang membatasi aksesnya.
+ */
 export async function getCurrentOutletId() {
-  const cookieStore = await cookies()
+  const { activeOutlet } = await requireOutletAccess()
 
-  return (
-    cookieStore.get("outlet_id")?.value ??
-    null
-  )
+  return activeOutlet.id
 }

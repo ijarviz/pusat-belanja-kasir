@@ -1,30 +1,46 @@
-import { createClient } from "@/lib/supabase/server"
-import { getActiveOutlet } from "@/lib/outlet"
+import "server-only"
+
+import { parseJson, query, queryOne, type Row } from "@/lib/db"
+import { requireOutletAccess } from "@/lib/outlet"
+
+import type {
+  Transaction,
+  TransactionArea,
+  TransactionProduct,
+} from "./types"
+
+type TransactionRow = Omit<Transaction, "autokirim_area">
+
+/*
+ * Kolom JSON `products` disimpan sebagai teks di MariaDB.
+ */
+export function normalizeTransaction(row: Row): TransactionRow {
+  return {
+    ...row,
+    products: parseJson<TransactionProduct[]>(row.products) ?? [],
+  } as TransactionRow
+}
 
 export async function getTransactions(
   channel?: string
 ) {
-  const supabase = await createClient()
+  const { activeOutlet } = await requireOutletAccess()
 
-  const { activeOutlet } = await getActiveOutlet()
-
-  let query = supabase
-    .from("transactions")
-    .select("*")
-    .eq("outlet_id", activeOutlet.id)
+  const params: unknown[] = [activeOutlet.id]
+  let sql = "SELECT * FROM transactions WHERE outlet_id = ?"
 
   if (channel) {
-    query = query.eq("channel", channel)
+    sql += " AND channel = ?"
+    params.push(channel)
   }
 
-  const { data, error } = await query.order(
-    "created_at",
-    {
-      ascending: false,
-    }
-  )
+  sql += " ORDER BY created_at DESC"
 
-  if (error) {
+  let transactions: TransactionRow[]
+
+  try {
+    transactions = (await query(sql, params)).map(normalizeTransaction)
+  } catch (error) {
     console.error(
       "[getTransactions] transaction error:",
       error
@@ -32,8 +48,6 @@ export async function getTransactions(
 
     throw error
   }
-
-  const transactions = data ?? []
 
   const destinationIds = [
     ...new Set(
@@ -50,11 +64,6 @@ export async function getTransactions(
     ),
   ]
 
-  // console.log(
-  //   "[getTransactions] destinationIds:",
-  //   destinationIds
-  // )
-
   if (destinationIds.length === 0) {
     return transactions.map((transaction) => ({
       ...transaction,
@@ -62,42 +71,32 @@ export async function getTransactions(
     }))
   }
 
-  const {
-    data: areas,
-    error: areaError,
-  } = await supabase
-    .from("autokirim_area")
-    .select(`
-      district_id,
-      district_name,
-      regency_name,
-      province_name,
-      postcode
-    `)
-    .in("district_id", destinationIds)
+  let areas: TransactionArea[]
 
-  if (areaError) {
+  try {
+    areas = await query<TransactionArea>(
+      `SELECT district_id, district_name, regency_name, province_name, postcode
+       FROM autokirim_area
+       WHERE district_id IN (?)`,
+      [destinationIds]
+    )
+  } catch (error) {
     console.error(
       "[getTransactions] area error:",
-      areaError
+      error
     )
 
-    throw areaError
+    throw error
   }
 
-  // console.log(
-  //   "[getTransactions] areas:",
-  //   areas
-  // )
-
   const areaMap = new Map(
-    (areas ?? []).map((area) => [
+    areas.map((area) => [
       String(area.district_id),
       area,
     ])
   )
 
-  const result = transactions.map((transaction) => {
+  return transactions.map((transaction): Transaction => {
     const destinationId =
       transaction.shipping_destination_id
 
@@ -109,79 +108,61 @@ export async function getTransactions(
           ) ?? null
         : null
 
-    // console.log(
-    //   "[getTransactions] mapping:",
-    //   {
-    //     transaction_id: transaction.id,
-    //     buyer_name: transaction.buyer_name,
-    //     shipping_destination_id:
-    //       destinationId,
-    //     shipping_destination_id_type:
-    //       typeof destinationId,
-    //     area,
-    //   }
-    // )
-
     return {
       ...transaction,
       autokirim_area: area,
     }
   })
-
-  return result
 }
 
 export async function getTransactionById(
   id: string
 ) {
-  const supabase = await createClient()
+  const { activeOutlet } = await requireOutletAccess()
 
-  const { activeOutlet } = await getActiveOutlet()
+  const row = await queryOne(
+    "SELECT * FROM transactions WHERE id = ? AND outlet_id = ?",
+    [id, activeOutlet.id]
+  )
 
-  const { data, error } = await supabase
-    .from("transactions")
-    .select("*")
-    .eq("id", id)
-    .eq("outlet_id", activeOutlet.id)
-    .single()
-
-  if (error) {
-    throw error
+  if (!row) {
+    throw new Error("Transaksi tidak ditemukan")
   }
 
-  let autokirim_area = null
+  const data = normalizeTransaction(row)
+
+  let autokirim_area: TransactionArea | null = null
 
   if (
     data.shipping_destination_id !== null &&
     data.shipping_destination_id !== undefined
   ) {
-    const {
-      data: area,
-      error: areaError,
-    } = await supabase
-      .from("autokirim_area")
-      .select(`
-        district_id,
-        district_name,
-        regency_name,
-        province_name,
-        postcode
-      `)
-      .eq(
-        "district_id",
-        data.shipping_destination_id
-      )
-      .maybeSingle()
-
-    if (areaError) {
-      throw areaError
-    }
-
-    autokirim_area = area
+    autokirim_area = await queryOne<TransactionArea>(
+      `SELECT district_id, district_name, regency_name, province_name, postcode
+       FROM autokirim_area
+       WHERE district_id = ?`,
+      [data.shipping_destination_id]
+    )
   }
 
   return {
     ...data,
     autokirim_area,
   }
+}
+
+/*
+ * Transaksi untuk halaman cetak resi, dibatasi ke outlet aktif.
+ */
+export async function getTransactionsForPrint(ids: string[]) {
+  const { activeOutlet } = await requireOutletAccess()
+
+  if (!ids.length) return []
+
+  const rows = await query(
+    "SELECT * FROM transactions WHERE id IN (?) AND outlet_id = ?",
+    [ids, activeOutlet.id]
+  )
+
+  return rows.map(normalizeTransaction)
 }

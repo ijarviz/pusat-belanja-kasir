@@ -71,7 +71,7 @@ type BluetoothResult = {
   writableCharacteristicUuid: string | null
 }
 
-type Printer = {
+export type Printer = {
   id: string
   name: string
   connection_type: ConnectionType

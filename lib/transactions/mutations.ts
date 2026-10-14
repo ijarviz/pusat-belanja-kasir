@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client"
+import { updateTransactionFieldAction } from "./actions"
 
 export async function updateTransactionField(
   id: string,
@@ -7,17 +7,7 @@ export async function updateTransactionField(
     payment_status: string
   }>
 ) {
-  const supabase = createClient()
-
-  const { error } = await supabase
-    .from("transactions")
-    .update({
-      ...payload,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-
-  if (error) throw error
+  await updateTransactionFieldAction(id, payload)
 }
 
 // Batalkan pengiriman (void AWB) untuk satu transaksi lewat route handler server
@@ -35,29 +25,3 @@ export async function cancelShipment(id: string): Promise<void> {
     throw new Error(json?.message || `Gagal membatalkan pengiriman (${res.status})`)
   }
 }
-
-// export async function cancelTransaction(params: {
-//   id: string
-//   reason?: string
-//   cancelledBy?: string | null
-//   status: "buyer_cancelled" | "outlet_cancelled"
-// }) {
-//   const supabase = createClient()
-
-//   const { id, reason, cancelledBy, status } = params
-
-//   const { error } = await supabase
-//     .from("transactions")
-//     .update({
-//       status,
-//       cancel_reason: reason ?? null,
-//       cancelled_by: cancelledBy ?? null,
-//       cancelled_at: new Date().toISOString(),
-//       updated_at: new Date().toISOString(),
-//     })
-//     .eq("id", id)
-
-//   if (error) {
-//     throw error
-//   }
-// }

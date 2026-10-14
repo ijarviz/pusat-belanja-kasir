@@ -1,5 +1,7 @@
 // import { AutoPrint } from "@/components/printer/auto-print"
+import { queryOne } from "@/lib/db"
 import { getActiveOutlet } from "@/lib/outlet"
+import { normalizeTransaction } from "@/lib/transactions/queries"
 import { formatCurrency } from "@/lib/utils/format-currency"
 import { formatReceiptPaymentMethod } from "@/lib/transactions/receipt"
 
@@ -19,41 +21,24 @@ export default async function OrderPage({
   const { id } = await params
   const { print } = await searchParams
 
-  const {
-    supabase,
-    activeOutlet,
-  } = await getActiveOutlet()
+  const { activeOutlet } = await getActiveOutlet()
 
-  const {
-    data: transaction,
-    error,
-  } = await supabase
-    .from("transactions")
-    .select(`
-      id,
-      outlet_id,
-      outlet_name,
-      order_date,
-      status,
-      payment_method,
-      buyer_name,
-      products,
-      subtotal,
-      shipping_cost,
-      admin_fee,
-      discount,
-      total,
-      payment_status,
-      payment_type,
-      paid_at,
-      invoice,
-      processed_by_name
-    `)
-    .eq("id", id)
-    .eq("outlet_id", activeOutlet.id)
-    .maybeSingle()
+  let transaction: ReturnType<typeof normalizeTransaction> | null = null
 
-  if (error) {
+  try {
+    const row = await queryOne(
+      `SELECT
+         id, outlet_id, outlet_name, order_date, status, payment_method,
+         buyer_name, products, subtotal, shipping_cost, admin_fee,
+         discount, total, payment_status, payment_type, paid_at,
+         invoice, processed_by_name
+       FROM transactions
+       WHERE id = ? AND outlet_id = ?`,
+      [id, activeOutlet.id]
+    )
+
+    transaction = row ? normalizeTransaction(row) : null
+  } catch (error) {
     console.error(
       "[OrderPage] Failed to fetch transaction:",
       error

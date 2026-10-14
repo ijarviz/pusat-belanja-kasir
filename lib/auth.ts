@@ -1,12 +1,11 @@
-import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 
-export async function getAuthUser() {
-  const supabase = await createClient()
+import { getSessionUser } from "@/lib/session"
 
-  const { data: { user } } = await supabase.auth.getUser()
+export async function getAuthUser() {
+  const user = await getSessionUser()
 
   if (!user) redirect("/auth/login")
 
-  return { supabase, user }
+  return { user }
 }

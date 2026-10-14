@@ -1,35 +1,30 @@
-import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
+
+import { query } from "@/lib/db"
+import { getSessionUser } from "@/lib/session"
 import WelcomeOutletForm from "./welcome-outlet-form"
 
 export default async function WelcomePage() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getSessionUser()
 
   if (!user) {
     redirect("/auth/login")
   }
 
   // ambil outlet user
-  const { data } = await supabase
-    .from("outlet_users")
-    .select(`
-      outlets (
-        id,
-        code,
-        name,
-        plan
-      )
-    `)
-    .eq("user_id", user.id)
-
-  const outlets =
-    data
-      ?.map((item: any) => item.outlets)
-      .filter(Boolean) || []
+  const outlets = await query<{
+    id: string
+    code: number
+    name: string
+    plan: string
+  }>(
+    `SELECT o.id, o.code, o.name, o.plan
+     FROM outlet_users ou
+     JOIN outlets o ON o.id = ou.outlet_id
+     WHERE ou.user_id = ?
+     ORDER BY ou.created_at`,
+    [user.id]
+  )
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">

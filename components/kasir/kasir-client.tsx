@@ -35,7 +35,10 @@ import {
 
 import KasirDialog from "@/components/kasir/kasir-dialog"
 
-import { createClient } from "@/lib/supabase/client"
+import {
+  createStoreTransactionAction,
+  getCurrentUserDisplayNameAction,
+} from "@/lib/transactions/checkout-actions"
 
 import { formatCurrency } from "@/lib/utils/format-currency"
 
@@ -117,17 +120,8 @@ export default function KasirClient({
 
   React.useEffect(() => {
     const getUser = async () => {
-      const supabase = createClient()
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
       const displayName =
-        user?.user_metadata?.display_name ||
-        user?.user_metadata?.full_name ||
-        user?.email ||
-        "-"
+        await getCurrentUserDisplayNameAction()
 
       setAdminName(displayName)
     }
@@ -490,8 +484,6 @@ export default function KasirClient({
     setError("")
 
     try {
-      const supabase = createClient()
-
       const firstProduct = items[0]?.product
 
       const outletId =
@@ -573,84 +565,27 @@ export default function KasirClient({
       * ==========================================
       */
 
-      const {
-        data: transactionId,
-        error,
-      } = await supabase.rpc(
-        "create_store_transaction",
-        {
-          p_outlet_id:
-            outletId,
+      const result =
+        await createStoreTransactionAction({
+          outletId,
+          buyerName: buyerName.trim(),
+          buyerPhone: buyerPhone.trim(),
+          paymentMethod,
+          products,
+          subtotal: total,
+          total,
+        })
 
-          p_buyer_name:
-            buyerName.trim(),
-
-          p_buyer_phone:
-            buyerPhone.trim(),
-
-          p_payment_method:
-            paymentMethod,
-
-          p_products:
-            products,
-
-          p_subtotal:
-            total,
-
-          p_total:
-            total,
-        }
-      )
-
-      if (error) {
-        throw error
+      if (!result.success) {
+        throw new Error(result.message)
       }
 
-      if (!transactionId) {
-        throw new Error(
-          "Transaksi berhasil dibuat tetapi ID transaksi tidak ditemukan."
-        )
-      }
+      const transaction = result.transaction
 
       console.log(
         "[Kasir] Transaction berhasil:",
-        transactionId
+        transaction.id
       )
-
-      /*
-      * ==========================================
-      * AMBIL TRANSACTION YANG BARU DIBUAT
-      * ==========================================
-      */
-
-      const {
-        data: transaction,
-        error: transactionError,
-      } = await supabase
-        .from("transactions")
-        .select("*")
-        .eq(
-          "id",
-          transactionId
-        )
-        .single()
-
-      if (transactionError) {
-        console.error(
-          "[Kasir] Gagal mengambil transaction:",
-          transactionError
-        )
-
-        throw new Error(
-          "Transaksi berhasil dibuat, tetapi data transaksi gagal diambil."
-        )
-      }
-
-      if (!transaction) {
-        throw new Error(
-          "Data transaksi tidak ditemukan."
-        )
-      }
 
       /*
       * ==========================================
