@@ -88,6 +88,9 @@ export function generateVariantRows(
         price_disc:
           existing?.price_disc ?? 0,
 
+        price_cost:
+          existing?.price_cost ?? 0,
+
         stock:
           existing?.stock ?? 0,
 
@@ -143,6 +146,9 @@ export function generateVariantRows(
         price_disc:
           existing?.price_disc ?? 0,
 
+        price_cost:
+          existing?.price_cost ?? 0,
+
         stock:
           existing?.stock ?? 0,
 
@@ -155,20 +161,6 @@ export function generateVariantRows(
     }
   }
 
-  console.log(
-    "GENERATED ROWS",
-    rows.map((r) => ({
-      id: r.id,
-      key: r.key,
-      option1: r.option1,
-      option2: r.option2,
-      option1ValueId:
-        r.option1ValueId,
-      option2ValueId:
-        r.option2ValueId,
-      stock: r.stock,
-    }))
-  )
-
+  
   return rows
 }

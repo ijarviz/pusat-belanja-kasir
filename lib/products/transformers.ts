@@ -282,6 +282,9 @@ export function transformVariantsToRows(
       price_disc:
         v.priceDisc ?? 0,
 
+      price_cost:
+        v.priceCost ?? 0,
+
       stock:
         v.stock ?? 0,
 

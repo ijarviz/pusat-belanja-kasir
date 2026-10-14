@@ -55,6 +55,7 @@ export type ProductFormState = {
   description: string
   price: number
   price_disc: number
+  price_cost: number
   stock: number
   weight: number
   length: number
@@ -137,6 +138,7 @@ export type VariantRow = {
 
   price: number
   price_disc: number
+  price_cost: number
 
   stock: number
   barcode: string | null

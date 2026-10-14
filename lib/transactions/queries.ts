@@ -50,10 +50,10 @@ export async function getTransactions(
     ),
   ]
 
-  console.log(
-    "[getTransactions] destinationIds:",
-    destinationIds
-  )
+  // console.log(
+  //   "[getTransactions] destinationIds:",
+  //   destinationIds
+  // )
 
   if (destinationIds.length === 0) {
     return transactions.map((transaction) => ({
@@ -85,10 +85,10 @@ export async function getTransactions(
     throw areaError
   }
 
-  console.log(
-    "[getTransactions] areas:",
-    areas
-  )
+  // console.log(
+  //   "[getTransactions] areas:",
+  //   areas
+  // )
 
   const areaMap = new Map(
     (areas ?? []).map((area) => [
@@ -109,18 +109,18 @@ export async function getTransactions(
           ) ?? null
         : null
 
-    console.log(
-      "[getTransactions] mapping:",
-      {
-        transaction_id: transaction.id,
-        buyer_name: transaction.buyer_name,
-        shipping_destination_id:
-          destinationId,
-        shipping_destination_id_type:
-          typeof destinationId,
-        area,
-      }
-    )
+    // console.log(
+    //   "[getTransactions] mapping:",
+    //   {
+    //     transaction_id: transaction.id,
+    //     buyer_name: transaction.buyer_name,
+    //     shipping_destination_id:
+    //       destinationId,
+    //     shipping_destination_id_type:
+    //       typeof destinationId,
+    //     area,
+    //   }
+    // )
 
     return {
       ...transaction,
