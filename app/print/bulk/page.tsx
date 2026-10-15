@@ -1,5 +1,5 @@
-import { getTransactionsForPrint } from "@/lib/transactions/queries"
-import ShippingLabel from "@/components/shipping-label"
+import { PrintLabels } from "@/components/print-labels/print-labels"
+import { getShippingLabels } from "@/lib/transactions/queries"
 
 export default async function BulkPrintPage({
   searchParams,
@@ -8,33 +8,9 @@ export default async function BulkPrintPage({
     ids?: string
   }>
 }) {
-  const { ids = "" } =
-    await searchParams
+  const { ids = "" } = await searchParams
 
-  const trxIds = ids
-    .split(",")
-    .filter(Boolean)
+  const rows = await getShippingLabels(ids.split(",").filter(Boolean))
 
-  const transactions =
-    await getTransactionsForPrint(trxIds)
-
-  return (
-    <div>
-      {transactions.map(
-        (trx, index) => (
-          <div
-            key={trx.id}
-            className={
-              index !==
-              transactions.length - 1
-                ? "break-after-page"
-                : ""
-            }
-          >
-            <ShippingLabel trx={trx} />
-          </div>
-        )
-      )}
-    </div>
-  )
+  return <PrintLabels rows={rows} />
 }

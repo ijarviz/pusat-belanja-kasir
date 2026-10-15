@@ -132,3 +132,89 @@ export async function cancelAlOrder(apiKey: string, transactionId: string) {
     return { rc: "99", ket: message }
   }
 }
+
+export type AlTrackingEvent = {
+  status: string
+  desc: string
+  date: string | null
+  time: string | null
+  image: string | null
+}
+
+export type AlTracking = {
+  awb: string
+  courierName: string | null
+  service: string | null
+  stats: string | null
+  etd: string | null
+  podImage: string | null
+  podReceiver: string | null
+  events: AlTrackingEvent[]
+}
+
+/*
+ * POST /api/h2h/lacak — riwayat scan kurir satu AWB, terbaru di atas.
+ * Bentuk respons (dilihat 2026-10-15): data.{stats, etd, pod_image,
+ * pod_receiver, histories[{status, desc, date, time, image}]}.
+ */
+export async function trackAlAwb(
+  apiKey: string,
+  awb: string
+): Promise<{ ok: true; tracking: AlTracking } | { ok: false; message: string }> {
+  const baseUrl = (
+    process.env.AL_H2H_BASE_URL || "https://api-h2h.autolaris.com"
+  ).replace(/\/$/, "")
+
+  try {
+    const res = await fetch(`${baseUrl}/api/h2h/lacak`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ awb }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(30_000),
+    })
+
+    const body = await res.json().catch(() => null)
+
+    if (body?.rc !== "00" || !body?.data) {
+      return { ok: false, message: body?.ket || `Gagal melacak resi (HTTP ${res.status})` }
+    }
+
+    const d = body.data
+    const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null)
+
+    const events: AlTrackingEvent[] = (Array.isArray(d.histories) ? d.histories : [])
+      .map((h: Record<string, unknown>) => ({
+        status: text(h.status) ?? "",
+        desc: text(h.desc) ?? text(h.keterangan) ?? "",
+        date: text(h.date),
+        time: text(h.time),
+        image: text(h.image),
+      }))
+      .sort((a: AlTrackingEvent, b: AlTrackingEvent) =>
+        `${b.date ?? ""} ${b.time ?? ""}`.localeCompare(`${a.date ?? ""} ${a.time ?? ""}`)
+      )
+
+    return {
+      ok: true,
+      tracking: {
+        awb: text(d.awb) ?? awb,
+        courierName: text(d.courier_name),
+        service: text(d.service),
+        stats: text(d.stats),
+        etd: text(d.etd),
+        podImage: text(d.pod_image),
+        podReceiver: text(d.pod_receiver),
+        events,
+      },
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error("[autolaris] POST /api/h2h/lacak gagal:", message)
+    return { ok: false, message: "Gagal menghubungi Autolaris" }
+  }
+}

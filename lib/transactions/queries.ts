@@ -150,5 +150,92 @@ export async function getTransactionsForPrint(ids: string[]) {
     [ids, activeOutlet.id]
   )
 
-  return rows.map(normalizeTransaction)
+  return attachDestinationAreas(rows.map(normalizeTransaction))
+}
+
+/*
+ * Data label resi (format autolaris-app): transaksi + outlet (logo kiri
+ * atas), pengirim dari Alamat Pickup, dan logo kurir dari expedition_master.
+ * Urutan mengikuti ids.
+ */
+export async function getShippingLabels(ids: string[]): Promise<LabelRow[]> {
+  const { activeOutlet } = await requireOutletAccess()
+
+  const [transactions, outlet, pickup, couriers] = await Promise.all([
+    getTransactionsForPrint(ids),
+    queryOne<{ name: string; image_url: string | null; phone: string | null }>(
+      "SELECT name, image_url, phone FROM outlets WHERE id = ?",
+      [activeOutlet.id]
+    ),
+    queryOne<{ pp_name: string | null; pp_phone: string | null }>(
+      "SELECT pp_name, pp_phone FROM outlet_pickup_point WHERE outlet_id = ? LIMIT 1",
+      [activeOutlet.id]
+    ),
+    query<{ code: string; name: string; image_url: string | null }>(
+      "SELECT code, name, image_url FROM expedition_master"
+    ),
+  ])
+
+  const courierByCode = new Map(couriers.map((c) => [c.code.toLowerCase(), c]))
+  const order = new Map(ids.map((id, index) => [id, index]))
+
+  return transactions
+    .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+    .map((trx) => {
+      const code = String(trx.shipping_courier_code ?? "").toLowerCase()
+      const area = trx.destination_area
+      const items = (trx.products ?? []).map((p) => ({
+        name: String(p.name ?? p.snapshot?.name ?? "-"),
+        variant: (p.variantName ?? p.snapshot?.variantName ?? null) as string | null,
+        qty: Number(p.qty) || 1,
+      }))
+
+      return {
+        id: trx.id,
+        invoice: trx.channel === "web" ? `PB${trx.invoice}` : `INV ${trx.invoice}`,
+        awb: trx.awb ?? "",
+        courierCode: code,
+        courierName: courierByCode.get(code)?.name ?? trx.shipping_courier ?? "-",
+        courierLogo: courierByCode.get(code)?.image_url ?? null,
+        service: trx.shipping_service ?? "",
+        shippingCost: Number(trx.shipping_cost ?? 0),
+        weight: Number(trx.shipping_weight ?? 0),
+        receiverName: trx.buyer_name ?? "-",
+        receiverPhone: trx.buyer_phone ?? "",
+        receiverAddress: trx.buyer_address ?? "",
+        district: area?.district_name ?? "",
+        regency: area?.regency_name ?? "",
+        province: area?.province_name ?? "",
+        note: trx.note ?? "",
+        outletName: outlet?.name ?? trx.outlet_name ?? "",
+        outletLogo: outlet?.image_url ?? null,
+        senderName: pickup?.pp_name || outlet?.name || trx.outlet_name || "",
+        senderPhone: pickup?.pp_phone || outlet?.phone || "",
+        items,
+      }
+    })
+}
+
+export type LabelRow = {
+  id: string
+  invoice: string
+  awb: string
+  courierCode: string
+  courierName: string
+  courierLogo: string | null
+  service: string
+  shippingCost: number
+  weight: number
+  receiverName: string
+  receiverPhone: string
+  receiverAddress: string
+  district: string
+  regency: string
+  province: string
+  note: string
+  outletName: string
+  outletLogo: string | null
+  senderName: string
+  senderPhone: string
+  items: { name: string; variant: string | null; qty: number }[]
 }

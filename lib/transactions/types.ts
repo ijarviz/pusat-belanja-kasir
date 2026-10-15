@@ -10,6 +10,8 @@ export type PaymentStatus =
   | "unpaid"
   | "paid"
   | "expired"
+  | "pending"
+  | "failed"
 
 export type TransactionChannel =
   | "web"
@@ -63,6 +65,8 @@ export type Transaction = {
   shipping_service: string | null
   shipping_order_status: string | null
   shipping_order_error?: string | null
+  shipping_courier_code?: string | null
+  shipping_weight?: number | null
 
   awb: string | null
   awb_created_at: string | null

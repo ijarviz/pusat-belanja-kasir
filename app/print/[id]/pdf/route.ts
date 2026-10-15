@@ -31,10 +31,10 @@ export async function GET(
 
     const baseUrl = getBaseUrl(req)
 
-    // Teruskan SEMUA cookie request (termasuk sesi Supabase) ke Chromium lewat
-    // header Cookie — meniru request browser asli. Pakai header `cookie` mentah
-    // dari request asli (paling andal: persis yang dikirim browser, termasuk
-    // chunked `sb-...-auth-token.0/.1`), fallback ke cookies() bila kosong.
+    // Teruskan SEMUA cookie request (sesi login `pb_session` dan `outlet_id`)
+    // ke Chromium lewat header Cookie — meniru request browser asli. Pakai
+    // header `cookie` mentah dari request asli (persis yang dikirim browser),
+    // fallback ke cookies() bila kosong.
     const rawCookieHeader = req.headers.get("cookie") ?? ""
     const cookieHeader =
       rawCookieHeader ||
@@ -74,16 +74,12 @@ export async function GET(
       )
     }
 
+    // Label diukur & diperkecil di client; tunggu sampai siap.
+    await page.waitForSelector('[data-print-ready="true"]', { timeout: 20_000 })
+
     const pdf = await page.pdf({
-      width: "100mm",
-      height: "150mm",
+      // Ukuran & margin dari @page di PrintLabels (A4, 8mm).
       printBackground: true,
-      margin: {
-        top: "0mm",
-        right: "0mm",
-        bottom: "0mm",
-        left: "0mm",
-      },
       preferCSSPageSize: true,
     })
 

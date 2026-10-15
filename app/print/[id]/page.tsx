@@ -1,7 +1,7 @@
-import { getTransactionsForPrint } from "@/lib/transactions/queries"
 import { notFound } from "next/navigation"
 
-import ShippingLabel from "@/components/shipping-label"
+import { PrintLabels } from "@/components/print-labels/print-labels"
+import { getShippingLabels } from "@/lib/transactions/queries"
 
 export default async function PrintPage({
   params,
@@ -10,13 +10,11 @@ export default async function PrintPage({
 }) {
   const { id } = await params
 
-  const [trx] = await getTransactionsForPrint([id])
+  const rows = await getShippingLabels([id])
 
-  if (!trx) {
+  if (!rows.length) {
     notFound()
   }
 
-  return (
-    <ShippingLabel trx={trx} />
-  )
+  return <PrintLabels rows={rows} />
 }

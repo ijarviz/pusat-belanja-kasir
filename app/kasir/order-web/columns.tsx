@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { updateTransactionField, cancelShipment } from "@/lib/transactions/mutations"
 import { useRouter } from "next/navigation"
+import { useState } from "react"
 import { toast } from "sonner"
 import { formatDateTime } from "@/lib/utils/format-date"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -23,11 +24,132 @@ import {
 } from "lucide-react"
 
 import { DataTableColumnHeader } from "@/components/data-table-column-header"
+import { ImageDefault } from "@/components/image-default"
+import { TrackingDialog } from "@/components/tracking-dialog"
 
 import type { Transaction } from "@/lib/transactions/types"
 import { getTotalItems, formatPaymentMethod } from "@/lib/transactions/utils"
 import { formatCurrency } from "@/lib/utils/format-currency"
 
+
+function ActionsCell({
+  transaction,
+  storefrontUrl,
+}: {
+  transaction: Transaction
+  storefrontUrl: string | null
+}) {
+  const router = useRouter()
+  const [trackOpen, setTrackOpen] = useState(false)
+
+  // const hasShipment = Boolean(transaction.shipping_ref1)
+  // const isPaid = transaction.payment_status === "paid"
+  const hasShipment =
+    Boolean(transaction.awb) ||
+    transaction.payment_status === "paid"
+
+  const handleCancel = async () => {
+    if (
+      !window.confirm(
+        "Batalkan pengiriman (void AWB) untuk transaksi ini? Tindakan ini tidak bisa dibatalkan."
+      )
+    ) {
+      return
+    }
+
+    try {
+      await cancelShipment(transaction.id)
+
+      router.refresh()
+
+      toast.success("Pengiriman dibatalkan")
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Gagal membatalkan pengiriman"
+      )
+    }
+  }
+
+  return (
+    <>
+    <TrackingDialog
+      transactionId={transaction.id}
+      awb={transaction.awb}
+      open={trackOpen}
+      onOpenChange={setTrackOpen}
+    />
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          className="h-8 w-8 p-0"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent align="start">
+        {hasShipment ? (
+          <>
+            {/* CETAK RESI */}
+            <DropdownMenuItem
+              onClick={() =>
+                window.open(
+                  `/print/${transaction.id}/pdf`,
+                  "_blank"
+                )
+              }
+            >
+              Cetak Resi
+            </DropdownMenuItem>
+
+            {/* LACAK PENGIRIMAN */}
+            <DropdownMenuItem
+              disabled={!transaction.awb}
+              onClick={() => setTrackOpen(true)}
+            >
+              Lacak Pengiriman
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            {/* BATALKAN PENGIRIMAN */}
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={!hasShipment}
+              onSelect={(e) => {
+                e.preventDefault()
+                handleCancel()
+              }}
+            >
+              Batalkan Pengiriman
+            </DropdownMenuItem>
+          </>
+        ) : (
+          /* BELUM PAID */
+          <DropdownMenuItem
+            disabled={!storefrontUrl}
+            onClick={() => {
+              if (!storefrontUrl) return
+
+              const base = storefrontUrl.replace(/\/+$/, "")
+
+              window.open(
+                `${base}/payment/${transaction.id}`,
+                "_blank"
+              )
+            }}
+          >
+            Lihat Link Pembayaran
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+    </>
+  )
+}
 
 export function getColumns(
   storefrontUrl: string | null
@@ -69,112 +191,9 @@ export function getColumns(
   {
     id: "actions",
 
-    cell: ({ row }) => {
-      const router = useRouter()
-      const transaction = row.original
-
-      // const hasShipment = Boolean(transaction.shipping_ref1)
-      // const isPaid = transaction.payment_status === "paid"
-      const hasShipment =
-        Boolean(transaction.awb) ||
-        transaction.payment_status === "paid"
-
-      const handleCancel = async () => {
-        if (
-          !window.confirm(
-            "Batalkan pengiriman (void AWB) untuk transaksi ini? Tindakan ini tidak bisa dibatalkan."
-          )
-        ) {
-          return
-        }
-
-        try {
-          await cancelShipment(transaction.id)
-
-          router.refresh()
-
-          toast.success("Pengiriman dibatalkan")
-        } catch (err) {
-          toast.error(
-            err instanceof Error
-              ? err.message
-              : "Gagal membatalkan pengiriman"
-          )
-        }
-      }
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="h-8 w-8 p-0"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent align="start">
-            {hasShipment ? (
-              <>
-                {/* CETAK RESI */}
-                <DropdownMenuItem
-                  onClick={() =>
-                    window.open(
-                      `/print/${transaction.id}/pdf`,
-                      "_blank"
-                    )
-                  }
-                >
-                  Cetak Resi
-                </DropdownMenuItem>
-
-                {/* LACAK PENGIRIMAN */}
-                <DropdownMenuItem
-                  disabled={!hasShipment}
-                  onClick={() => {
-                    // aksi lacak pengiriman
-                  }}
-                >
-                  Lacak Pengiriman
-                </DropdownMenuItem>
-
-                <DropdownMenuSeparator />
-
-                {/* BATALKAN PENGIRIMAN */}
-                <DropdownMenuItem
-                  variant="destructive"
-                  disabled={!hasShipment}
-                  onSelect={(e) => {
-                    e.preventDefault()
-                    handleCancel()
-                  }}
-                >
-                  Batalkan Pengiriman
-                </DropdownMenuItem>
-              </>
-            ) : (
-              /* BELUM PAID */
-              <DropdownMenuItem
-                disabled={!storefrontUrl}
-                onClick={() => {
-                  if (!storefrontUrl) return
-
-                  const base = storefrontUrl.replace(/\/+$/, "")
-
-                  window.open(
-                    `${base}/payment/${transaction.id}`,
-                    "_blank"
-                  )
-                }}
-              >
-                Lihat Link Pembayaran
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )
-    },
+    cell: ({ row }) => (
+      <ActionsCell transaction={row.original} storefrontUrl={storefrontUrl} />
+    ),
   },
 
   {
@@ -188,12 +207,13 @@ export function getColumns(
           {products.map((p: any, idx: number) => (
             <div key={idx} className="flex gap-2">
               
-              <img
-                src={p.image || p.snapshot?.image}
-                alt={p.name}
-                className="w-10 h-10 rounded-md object-cover border shrink-0"
-                loading="eager"
-              />
+              <div className="relative w-10 h-10 shrink-0">
+                <ImageDefault
+                  src={p.image || p.snapshot?.image}
+                  alt={p.name}
+                  iconSize={16}
+                />
+              </div>
 
               <div className="leading-snug whitespace-normal break-words">
                 <div className="flex flex-row gap-4">
@@ -332,6 +352,8 @@ export function getColumns(
           ? "text-green-600 bg-green-100"
           : status === "expired"
           ? "text-red-600 bg-red-100"
+          : status === "failed"
+          ? "text-gray-600 bg-gray-100"
           : "text-yellow-600 bg-yellow-100"
 
       return (
@@ -463,6 +485,14 @@ export function getColumns(
           {data.order_date
             ? formatDateTime(data.order_date)
             : "-"}
+        </div>
+
+        {/* INVOICE */}
+        <div className="text-[11px] text-muted-foreground">
+          Invoice:{" "}
+          <span className="font-mono font-semibold text-foreground">
+            PB{data.invoice ?? "-"}
+          </span>
         </div>
       </div>
     )
