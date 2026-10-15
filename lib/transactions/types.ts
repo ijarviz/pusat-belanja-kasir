@@ -62,6 +62,7 @@ export type Transaction = {
   shipping_courier: string | null
   shipping_service: string | null
   shipping_order_status: string | null
+  shipping_order_error?: string | null
 
   awb: string | null
   awb_created_at: string | null

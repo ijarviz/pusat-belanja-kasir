@@ -238,9 +238,20 @@ export function getColumns(
           <div className="text-xs text-muted-foreground">
             {service}
           </div>
-          <div className="text-xs text-muted-foreground">
-            {data.awb || "-"}
-          </div>
+          {data.awb ? (
+            <div className="mt-1 text-xs">
+              <span className="text-muted-foreground">AWB: </span>
+              <span className="font-mono font-semibold">{data.awb}</span>
+            </div>
+          ) : data.payment_status === "paid" && data.status !== "cancelled" ? (
+            <div className="mt-1 text-xs text-amber-600">
+              {data.shipping_order_status === "failed"
+                ? `Resi gagal: ${data.shipping_order_error || "coba lagi otomatis"}`
+                : "Menunggu resi..."}
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground">-</div>
+          )}
         </div>
       )
     },

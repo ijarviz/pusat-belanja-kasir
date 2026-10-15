@@ -100,5 +100,17 @@ export async function POST(
     )
   }
 
+  // Order web yang stoknya dikurangi saat dibuat: kembalikan stoknya
+  // ("Batal order inv <n> melalui web"). Idempoten; order lama tanpa
+  // stock_deducted_at dilewati oleh procedure-nya.
+  try {
+    await execute("CALL release_web_order_stock(?)", [id])
+  } catch (stockErr) {
+    console.error(
+      `cancelShipment: trx ${id} dibatalkan tapi stok gagal dikembalikan:`,
+      stockErr instanceof Error ? stockErr.message : stockErr
+    )
+  }
+
   return Response.json({ success: true, message: "Pengiriman dibatalkan" })
 }
