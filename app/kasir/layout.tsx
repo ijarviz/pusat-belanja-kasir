@@ -21,6 +21,7 @@ export default async function KasirLayout({
     <KasirClientLayout
       outlets={sidebarData.outlets}
       user={sidebarData.user}
+      badges={sidebarData.badges}
     >
       {children}
     </KasirClientLayout>

@@ -48,6 +48,12 @@ import { DateRangePicker } from "@/components/date-range-picker"
 import { DateRange } from "react-day-picker"
 import { format } from "date-fns"
 import { getColumns } from "./columns"
+import {
+  DEFAULT_ORDER_STAGE,
+  ORDER_STAGES,
+  orderStage,
+} from "@/lib/transactions/stage"
+import { cn } from "@/lib/utils"
 
 interface DataTableProps {
   data: Transaction[]
@@ -85,6 +91,14 @@ export function DataTable({
 
   const initialPage =
     Number(searchParams.get("page") ?? 1)
+
+  // Tab tahap order; default Create (perlu segera diproses untuk pickup).
+  const [stage, setStage] = React.useState<string>(
+    // "semua" di URL karena updateURL membuang nilai "all".
+    searchParams.get("tahap") === "semua"
+      ? "all"
+      : (searchParams.get("tahap") ?? DEFAULT_ORDER_STAGE)
+  )
 
   /*
    * ============================
@@ -323,12 +337,62 @@ export function DataTable({
 
   /*
    * ============================
+   * STAGE TABS
+   * ============================
+   */
+
+  const stageCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const item of filteredData) {
+      const key = orderStage(item)
+      counts[key] = (counts[key] ?? 0) + 1
+    }
+    return counts
+  }, [filteredData])
+
+  const stageData = React.useMemo(
+    () =>
+      stage === "all"
+        ? filteredData
+        : filteredData.filter((item) => orderStage(item) === stage),
+    [filteredData, stage]
+  )
+
+  // Tab tanpa data disembunyikan, kecuali Semua, Create dan tab aktif.
+  const stageTabs = [
+    { key: "all", label: "Semua", count: filteredData.length },
+    ...ORDER_STAGES.map((s) => ({
+      key: s.key as string,
+      label: s.label as string,
+      count: stageCounts[s.key] ?? 0,
+    })).filter(
+      (s) => s.count > 0 || s.key === DEFAULT_ORDER_STAGE || s.key === stage
+    ),
+  ]
+
+  const handleStageChange = (next: string) => {
+    setStage(next)
+    table.resetRowSelection()
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+    updateURL({
+      tahap:
+        next === DEFAULT_ORDER_STAGE
+          ? null
+          : next === "all"
+            ? "semua"
+            : next,
+      page: "1",
+    })
+  }
+
+  /*
+   * ============================
    * TABLE
    * ============================
    */
 
   const table = useReactTable({
-    data: filteredData,
+    data: stageData,
     columns,
 
     state: {
@@ -568,27 +632,39 @@ export function DataTable({
       </div>
 
       {/* ============================
-          INFO
+          TAHAP + INFO PENCARIAN
           ============================ */}
 
-      <div className="flex">
+      <div className="flex flex-col gap-2">
+
+        {/* TAB TAHAP ORDER */}
+        <div className="flex flex-wrap gap-2">
+          {stageTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => handleStageChange(tab.key)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-sm transition-colors",
+                stage === tab.key
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "bg-background hover:bg-muted"
+              )}
+            >
+              {tab.label}{" "}
+              <span className={stage === tab.key ? "opacity-80" : "text-muted-foreground"}>
+                ({tab.count})
+              </span>
+            </button>
+          ))}
+        </div>
 
         <div className="text-sm text-muted-foreground">
-
-          Menampilkan{" "}
-          {
-            table
-              .getFilteredRowModel()
-              .rows.length
-          }{" "}
-          Produk
-
           {searchParams.get(
             "cari"
           ) && (
             <span>
-              {" "}
-              dari pencarian{" "}
+              Hasil pencarian{" "}
 
               <span className="font-medium">
                 "

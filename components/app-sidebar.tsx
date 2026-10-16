@@ -72,10 +72,12 @@ export const navMain = data.navMain
 export function AppSidebar({
   outlets,
   user,
+  badges,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   outlets: any[]
   user: SidebarUser | null
+  badges?: Record<string, number>
 }) {
 
   return (
@@ -84,7 +86,7 @@ export function AppSidebar({
         <OutletSwitcher outlets={outlets} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={data.navMain} badges={badges} />
       </SidebarContent>
       <SidebarFooter>
         {user && <NavUser user={user} />}

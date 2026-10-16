@@ -25,6 +25,7 @@ import {
   Invoice01Icon,
   PrinterIcon,
   MoreHorizontalIcon,
+  WhatsappIcon,
 } from "@hugeicons/core-free-icons"
 // import { printInvoice } from "@/lib/printer/print-invoice"
 
@@ -109,8 +110,14 @@ export function getColumns(
           {/* LIHAT INVOICE */}
           <DropdownMenuItem
             onClick={() => {
+              // Invoice publik di toko outlet (store /invoice/<id>) supaya
+              // bisa dibagikan; tanpa URL toko, pakai halaman kasir.
+              const base = storefrontUrl?.replace(/\/+$/, "")
+
               window.open(
-                `/order/${data.id}`,
+                base
+                  ? `${base}/invoice/${data.id}`
+                  : `/order/${data.id}`,
                 "_blank"
               )
             }}
@@ -306,6 +313,28 @@ export function getColumns(
             <div className="text-xs text-muted-foreground">
               {data.buyer_phone || "-"}
             </div>
+
+            {data.buyer_phone && (
+              <button
+                type="button"
+                onClick={() => {
+                  const phone = data.buyer_phone
+                    ?.replace(/\D/g, "")
+                    ?.replace(/^0/, "62")
+
+                  window.open(
+                    `https://wa.me/${phone}`,
+                    "_blank"
+                  )
+                }}
+                className="text-green-600 hover:text-green-700"
+              >
+                <HugeiconsIcon
+                  icon={WhatsappIcon}
+                  size={14}
+                />
+              </button>
+            )}
           </div>
 
           
