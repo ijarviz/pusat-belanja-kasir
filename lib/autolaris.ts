@@ -160,7 +160,12 @@ export type AlTracking = {
 export async function trackAlAwb(
   apiKey: string,
   awb: string
-): Promise<{ ok: true; tracking: AlTracking } | { ok: false; message: string }> {
+): Promise<
+  | { ok: true; tracking: AlTracking }
+  // notAvailable: AL menjawab tapi tidak punya data kurir (mis. resi batal
+  // sebelum dipickup); bukan gangguan jaringan.
+  | { ok: false; message: string; notAvailable?: boolean }
+> {
   const baseUrl = (
     process.env.AL_H2H_BASE_URL || "https://api-h2h.autolaris.com"
   ).replace(/\/$/, "")
@@ -181,7 +186,11 @@ export async function trackAlAwb(
     const body = await res.json().catch(() => null)
 
     if (body?.rc !== "00" || !body?.data) {
-      return { ok: false, message: body?.ket || `Gagal melacak resi (HTTP ${res.status})` }
+      return {
+        ok: false,
+        message: body?.ket || `Gagal melacak resi (HTTP ${res.status})`,
+        notAvailable: res.ok && body?.rc != null,
+      }
     }
 
     const d = body.data

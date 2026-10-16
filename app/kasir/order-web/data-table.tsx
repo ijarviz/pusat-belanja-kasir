@@ -552,8 +552,8 @@ export function DataTable({
                 Unpaid
               </SelectItem>
 
-              <SelectItem value="expired">
-                Expired
+              <SelectItem value="failed">
+                Failed
               </SelectItem>
             </SelectContent>
           </Select>

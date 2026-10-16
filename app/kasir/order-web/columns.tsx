@@ -113,19 +113,21 @@ function ActionsCell({
               Lacak Pengiriman
             </DropdownMenuItem>
 
-            <DropdownMenuSeparator />
-
-            {/* BATALKAN PENGIRIMAN */}
-            <DropdownMenuItem
-              variant="destructive"
-              disabled={!hasShipment}
-              onSelect={(e) => {
-                e.preventDefault()
-                handleCancel()
-              }}
-            >
-              Batalkan Pengiriman
-            </DropdownMenuItem>
+            {/* BATALKAN PENGIRIMAN: tidak ada untuk order yang sudah batal */}
+            {transaction.status !== "cancelled" && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={(e) => {
+                    e.preventDefault()
+                    handleCancel()
+                  }}
+                >
+                  Batalkan Pengiriman
+                </DropdownMenuItem>
+              </>
+            )}
           </>
         ) : (
           /* BELUM PAID */
@@ -149,6 +151,11 @@ function ActionsCell({
     </DropdownMenu>
     </>
   )
+}
+
+function displayPaymentStatus(status: unknown) {
+  const value = typeof status === "string" && status ? status : "unpaid"
+  return value === "expired" ? "failed" : value
 }
 
 export function getColumns(
@@ -269,9 +276,18 @@ export function getColumns(
                 ? `Resi gagal: ${data.shipping_order_error || "coba lagi otomatis"}`
                 : "Menunggu resi..."}
             </div>
-          ) : (
+          ) : data.shipping_order_status ? null : (
             <div className="text-xs text-muted-foreground">-</div>
           )}
+          {/* Status pengiriman (dulu kolom Shipment), di bawah AWB. "failed"
+              tanpa AWB sudah tampil sebagai "Resi gagal" di atas. */}
+          {data.shipping_order_status &&
+            !(data.shipping_order_status === "failed" && !data.awb) && (
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                Status:{" "}
+                <span className="font-medium text-foreground">{data.shipping_order_status}</span>
+              </div>
+            )}
         </div>
       )
     },
@@ -313,45 +329,22 @@ export function getColumns(
   // },
 
   {
-  accessorKey: "shipping_order_status",
-  header: "Shipment",
-
-  cell: ({ row }) => {
-    const status = row.original.shipping_order_status
-
-    return (
-      <div className="min-w-[140px]">
-        {status ? (
-          <span className="text-sm">
-            {status}
-          </span>
-        ) : (
-          <span className="text-sm text-muted-foreground">
-            -
-          </span>
-        )}
-      </div>
-    )
-  },
-  },
-
-  {
     accessorKey: "payment_status",
+    // expired (lewat batas bayar 5 menit) dan failed (ditolak/dibatalkan di
+    // AL) sama-sama berarti tidak jadi dibayar: tampil & difilter sebagai FAILED.
     filterFn: (row, id, value) => {
       if (!value) return true
-      return row.getValue(id) === value
+      return displayPaymentStatus(row.getValue(id)) === value
     },
     header: "Payment",
     cell: ({ row }) => {
       const data = row.original
 
-      const status = data.payment_status ?? "unpaid"
+      const status = displayPaymentStatus(data.payment_status)
 
       const statusColor =
         status === "paid"
           ? "text-green-600 bg-green-100"
-          : status === "expired"
-          ? "text-red-600 bg-red-100"
           : status === "failed"
           ? "text-gray-600 bg-gray-100"
           : "text-yellow-600 bg-yellow-100"
@@ -377,7 +370,7 @@ export function getColumns(
     header: ({ column }) => (
       <DataTableColumnHeader
         column={column}
-        title="Total"
+        title="Total Belanja"
       />
     ),
 
