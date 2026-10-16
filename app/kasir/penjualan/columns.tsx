@@ -158,9 +158,9 @@ export function getColumns(
         row.original.invoice
 
       return (
-        <div className="w-[44px]">
+        <div className="w-[64px]">
           <div className="font-medium text-sm">
-            {invoice || "-"}
+            {invoice ? `PB${invoice}` : "-"}
           </div>
         </div>
       )

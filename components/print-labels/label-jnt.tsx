@@ -15,10 +15,14 @@ export function LabelJnt({ row }: { row: LabelRow }) {
     .map((item) => [item.name, item.variant].filter(Boolean).join(" - "))
     .join(", ")
   const fullAddress = [row.receiverAddress, row.district, row.regency].filter(Boolean).join(" ")
-  const logo = row.courierLogo ? (
-    <img src={row.courierLogo} alt={row.courierName} className="h-8 w-auto object-contain" />
-  ) : (
-    <span className="font-bold">{row.courierName}</span>
+  // Logo J&T versi crop (uploads/expeditions/jnt.png berisi ~60% ruang
+  // transparan, jadi tampak kecil di label).
+  const logo = (className: string) => (
+    <img
+      src="/assets/images/ekspedisi/jnt-logo.png"
+      alt={row.courierName}
+      className={`${className} w-auto max-w-full object-contain`}
+    />
   )
 
   return (
@@ -29,7 +33,7 @@ export function LabelJnt({ row }: { row: LabelRow }) {
             <td className="w-[45%] border-l-2 border-t-2 border-black p-2">
               <OutletLogo src={row.outletLogo} name={row.outletName} />
             </td>
-            <td className="w-[45%] border-t-2 border-black p-2 text-left">{logo}</td>
+            <td className="w-[45%] border-t-2 border-black p-2 text-left">{logo("h-12")}</td>
             <td
               className="w-[10%] border-r-2 border-t-2 border-black bg-black p-2 text-center text-2xl font-black text-white"
               style={BLACK_CELL}
@@ -147,7 +151,7 @@ export function LabelJnt({ row }: { row: LabelRow }) {
       </table>
 
       <div className="grid grid-cols-5 border-t-2 border-dashed border-black">
-        <div className="col-span-2 border-l-2 border-black p-2 pt-5">{logo}</div>
+        <div className="col-span-2 flex items-center border-l-2 border-black p-2 pt-5">{logo("h-14")}</div>
         <div className="col-span-3">
           <div className="border-r-2 border-black p-2 pt-5">
             <Barcode value={row.awb} height={52} />

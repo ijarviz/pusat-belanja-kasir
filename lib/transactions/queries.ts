@@ -192,7 +192,7 @@ export async function getShippingLabels(ids: string[]): Promise<LabelRow[]> {
 
       return {
         id: trx.id,
-        invoice: trx.channel === "web" ? `PB${trx.invoice}` : `INV ${trx.invoice}`,
+        invoice: `PB${trx.invoice}`,
         awb: trx.awb ?? "",
         courierCode: code,
         courierName: courierByCode.get(code)?.name ?? trx.shipping_courier ?? "-",

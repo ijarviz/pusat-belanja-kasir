@@ -1,6 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
 import type { LabelRow } from "@/lib/transactions/queries"
-import { formatCurrency } from "@/lib/utils/format-currency"
 
 import { Barcode } from "./barcode"
 import { OutletLogo } from "./outlet-logo"
@@ -16,9 +15,8 @@ export function LabelGeneric({ row, variant }: { row: LabelRow; variant: "single
       className="w-full border border-black bg-white p-3 font-medium text-black"
       style={{ fontSize: variant === "single" ? 11 : 16 }}
     >
-      <div className="flex items-center justify-between border-b p-2">
+      <div className="flex items-center border-b p-2">
         <OutletLogo src={row.outletLogo} name={row.outletName} />
-        <span className="text-2xl font-bold">{row.outletName}</span>
       </div>
 
       <div className="flex justify-center px-2 pb-2 pt-4">
@@ -44,7 +42,7 @@ export function LabelGeneric({ row, variant }: { row: LabelRow; variant: "single
 
       <div className="mb-1 px-2">
         <div className="rounded border border-black p-4">
-          <div className="text-xs">Penerima tidak perlu bayar apapun ke kurir.</div>
+          <div className="text-center text-xl font-bold">Penerima tidak perlu bayar apapun ke kurir.</div>
         </div>
       </div>
 
@@ -81,8 +79,6 @@ export function LabelGeneric({ row, variant }: { row: LabelRow; variant: "single
           </div>
         ))}
       </div>
-
-      <div className="mt-2 text-right text-sm">Ongkir: {formatCurrency(row.shippingCost)}</div>
     </div>
   )
 }
