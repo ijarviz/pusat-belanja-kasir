@@ -75,12 +75,12 @@ export async function POST(
     )
   }
 
-  // Sukses → tandai cancelled dan lepas AWB supaya tidak bisa dicetak ulang.
+  // Sukses → tandai cancelled. AWB tetap disimpan dan selalu ditampilkan di
+  // kolom Ekspedisi (permintaan user 2026-10-16).
   try {
     await execute(
       `UPDATE transactions
        SET status = 'cancelled',
-           awb = NULL,
            shipping_order_status = 'cancelled',
            cancelled_at = CURRENT_TIMESTAMP(6),
            updated_at = CURRENT_TIMESTAMP(6)
