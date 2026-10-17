@@ -11,8 +11,9 @@ import type { Transaction } from "./types"
  * kecil). Teks itu dipetakan ke id di SHIPMENT_TEXT_IDS; id yang tidak
  * pernah dikirim H2H (13-19, 100) ikut dipetakan dari padanan teksnya
  * kalau suatu saat muncul. Pembatalan dibedakan dari kolom kita sendiri:
- * expired = batas bayar 5 menit (11), failed = pembayaran gagal (10),
- * selain itu dibatalkan seller / di AL (12).
+ * tidak jadi dibayar (expired = lewat batas bayar 5 menit, atau failed)
+ * jadi satu badge "Pembayaran Gagal" (10, permintaan user 2026-10-17; id 11
+ * tidak dipakai), selain itu dibatalkan seller / di AL (12).
  *
  * Order sebelum integrasi AL (tanpa al_transaction_id, era AutoKirim)
  * tidak pernah disinkron: tanpa id, masuk tab "Arsip".
@@ -78,12 +79,12 @@ const SHIPMENT_TEXT_IDS: Record<string, number> = {
 }
 
 export const ORDER_TABS = [
-  { key: "belum_bayar", label: "Belum Bayar", statusIds: [1, 10] },
+  { key: "belum_bayar", label: "Belum Bayar", statusIds: [1] },
   { key: "perlu_dikirim", label: "Perlu Dikirim", statusIds: [2, 3, 16] },
   { key: "dikirim", label: "Dikirim", statusIds: [4, 5, 6, 8, 14] },
   { key: "selesai", label: "Selesai", statusIds: [100] },
   { key: "gagal", label: "Pengiriman Gagal", statusIds: [7, 9, 13, 15, 17, 18] },
-  { key: "dibatalkan", label: "Dibatalkan", statusIds: [11, 12, 19] },
+  { key: "dibatalkan", label: "Batal", statusIds: [10, 11, 12, 19] },
   { key: "arsip", label: "Arsip", statusIds: [] as number[] },
 ] as const
 
@@ -106,8 +107,7 @@ export function shipmentStatusId(t: StageFields): number | null {
   if (!t.al_transaction_id) return null
 
   if (t.status === "cancelled") {
-    if (t.payment_status === "expired") return 11
-    if (t.payment_status === "failed") return 10
+    if (t.payment_status === "expired" || t.payment_status === "failed") return 10
     return 12
   }
 
