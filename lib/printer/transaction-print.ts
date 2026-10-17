@@ -1,5 +1,7 @@
 "use client"
 
+import { plog } from "@/lib/printer/logger"
+
 import {
   connectSavedUsbPrinter,
   disconnectUsbPrinter,
@@ -59,7 +61,7 @@ async function getDefaultPrinter(
   try {
     data = await getDefaultPrinterAction(outletId)
   } catch (error) {
-    console.error(
+    plog.error(
       "[Print] Gagal mengambil printer default:",
       error
     )
@@ -90,7 +92,7 @@ async function buildTransactionReceipt(
       ? await getReceiptOutletAction(data.outlet_id)
       : null
   } catch (outletError) {
-    console.error(
+    plog.error(
       "[Print] Gagal mengambil outlet:",
       outletError
     )
@@ -240,7 +242,7 @@ async function printTransactionUsb(
       data
     )
 
-  console.log(
+  plog.log(
     "[USB Print] Printer:",
     {
       id:
@@ -260,7 +262,7 @@ async function printTransactionUsb(
     }
   )
 
-  console.log(
+  plog.log(
     "[USB Print] Receipt bytes:",
     receiptBytes.byteLength
   )
@@ -287,7 +289,7 @@ async function printTransactionUsb(
       receiptBytes
     )
 
-    console.log(
+    plog.log(
       "[USB Print] Receipt berhasil dikirim."
     )
   } finally {
@@ -318,7 +320,7 @@ async function printTransactionBluetooth(
       data
     )
 
-  console.log(
+  plog.log(
     "[Bluetooth Print] Printer:",
     {
       id:
@@ -341,7 +343,7 @@ async function printTransactionBluetooth(
     }
   )
 
-  console.log(
+  plog.log(
     "[Bluetooth Print] Receipt bytes:",
     receiptBytes.byteLength
   )
@@ -371,7 +373,7 @@ async function printTransactionBluetooth(
       receiptBytes
     )
 
-    console.log(
+    plog.log(
       "[Bluetooth Print] Receipt berhasil dikirim."
     )
   } finally {
@@ -409,7 +411,7 @@ export async function printTransaction(
     )
   }
 
-  console.log(
+  plog.log(
     "[Print Transaction] Default printer:",
     {
       id:

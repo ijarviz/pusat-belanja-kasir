@@ -5,7 +5,8 @@ import {
   verifySessionToken,
 } from "@/lib/session-token";
 
-const PUBLIC_PATH_PREFIXES = ["/auth", "/login", "/uploads"];
+// /.well-known (assetlinks APK) dan manifest harus terbuka tanpa login.
+const PUBLIC_PATH_PREFIXES = ["/auth", "/login", "/uploads", "/.well-known", "/manifest.webmanifest"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

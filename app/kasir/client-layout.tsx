@@ -46,9 +46,13 @@ import { navMain } from "@/components/app-sidebar"
 //   }
 // }
 function getBreadcrumb(pathname: string) {
-  const found = navMain.find(
-    (item) => item.url === pathname
-  )
+  // URL persis, atau menu dengan prefix terpanjang untuk sub-halaman
+  // (mis. /kasir/pengaturan/printer/log -> Printer, bukan Kasir).
+  const found =
+    navMain.find((item) => item.url === pathname) ??
+    navMain
+      .filter((item) => item.url && pathname.startsWith(`${item.url}/`))
+      .sort((a, b) => b.url.length - a.url.length)[0]
 
   return {
     parent: found?.title ?? "Unknown",

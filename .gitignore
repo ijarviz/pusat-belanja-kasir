@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# APK kasir (dibangun dari android/, lihat android/README.md)
+/public/download/*.apk
+
+# Build Android TWA
+/android/app/build/
+/android/build/
+/android/.gradle/
+/android/local.properties
+*.keystore
+*.jks

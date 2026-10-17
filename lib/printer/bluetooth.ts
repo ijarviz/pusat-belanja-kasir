@@ -1,3 +1,5 @@
+import { plog } from "@/lib/printer/logger"
+
 export type BluetoothCharacteristicInfo = {
   uuid: string
   properties: string[]
@@ -76,7 +78,7 @@ function getCharacteristicProperties(
 export async function connectBluetoothPrinter(): Promise<BluetoothPrinterConnection> {
   const bluetooth = getBluetooth()
 
-  console.log(
+  plog.log(
     "[Bluetooth] Requesting device..."
   )
 
@@ -89,7 +91,7 @@ export async function connectBluetoothPrinter(): Promise<BluetoothPrinterConnect
       ],
     })
 
-  console.log(
+  plog.log(
     "[Bluetooth] Device selected:",
     {
       id: device.id,
@@ -103,7 +105,7 @@ export async function connectBluetoothPrinter(): Promise<BluetoothPrinterConnect
     )
   }
 
-  console.log(
+  plog.log(
     "[Bluetooth] Connecting GATT..."
   )
 
@@ -113,7 +115,7 @@ export async function connectBluetoothPrinter(): Promise<BluetoothPrinterConnect
     server =
       await device.gatt.connect()
   } catch (error) {
-    console.error(
+    plog.error(
       "[Bluetooth] GATT connection failed:",
       error
     )
@@ -125,7 +127,7 @@ export async function connectBluetoothPrinter(): Promise<BluetoothPrinterConnect
     )
   }
 
-  console.log(
+  plog.log(
     "[Bluetooth] GATT connected:",
     server.connected
   )
@@ -133,7 +135,7 @@ export async function connectBluetoothPrinter(): Promise<BluetoothPrinterConnect
   const primaryServices =
     await server.getPrimaryServices()
 
-  console.log(
+  plog.log(
     "[Bluetooth] Services:",
     primaryServices.map(
       (service) => service.uuid
@@ -148,7 +150,7 @@ export async function connectBluetoothPrinter(): Promise<BluetoothPrinterConnect
     | null = null
 
   for (const service of primaryServices) {
-    console.log(
+    plog.log(
       "[Bluetooth] Service:",
       service.uuid
     )
@@ -169,7 +171,7 @@ export async function connectBluetoothPrinter(): Promise<BluetoothPrinterConnect
             characteristic
           )
 
-        console.log(
+        plog.log(
           "[Bluetooth] Characteristic:",
           {
             service:
@@ -203,7 +205,7 @@ export async function connectBluetoothPrinter(): Promise<BluetoothPrinterConnect
             writableCharacteristic =
               characteristic
 
-            console.log(
+            plog.log(
               "[Bluetooth] Printer writable characteristic found:",
               characteristic.uuid
             )
@@ -211,7 +213,7 @@ export async function connectBluetoothPrinter(): Promise<BluetoothPrinterConnect
         }
       }
     } catch (error) {
-      console.warn(
+      plog.warn(
         "[Bluetooth] Failed to read characteristics:",
         service.uuid,
         error
@@ -246,7 +248,7 @@ export async function connectBluetoothPrinter(): Promise<BluetoothPrinterConnect
           writableCharacteristic =
             fallback
 
-          console.log(
+          plog.log(
             "[Bluetooth] Fallback writable characteristic:",
             fallback.uuid
           )
@@ -327,7 +329,7 @@ export async function writeBluetoothData(
     )
   }
 
-  console.log(
+  plog.log(
     "[Bluetooth] Writing data:",
     {
       bytes:
@@ -351,7 +353,7 @@ export async function writeBluetoothData(
           BLUETOOTH_CHUNK_SIZE
       )
 
-    console.log(
+    plog.log(
       "[Bluetooth] Sending chunk:",
       {
         offset,
@@ -369,7 +371,7 @@ export async function writeBluetoothData(
     )
   }
 
-  console.log(
+  plog.log(
     "[Bluetooth] All data sent successfully"
   )
 }
@@ -432,7 +434,7 @@ export async function connectSavedBluetoothPrinter(
   const devices =
     await bluetooth.getDevices()
 
-  console.log(
+  plog.log(
     "[Bluetooth Saved] Authorized devices:",
     devices.map((device) => ({
       id: device.id,
@@ -461,7 +463,7 @@ export async function connectSavedBluetoothPrinter(
     )
   }
 
-  console.log(
+  plog.log(
     "[Bluetooth Saved] Device found:",
     {
       id: device.id,
@@ -480,7 +482,7 @@ export async function connectSavedBluetoothPrinter(
     )
   }
 
-  console.log(
+  plog.log(
     "[Bluetooth Saved] GATT connected:",
     server.connected
   )
@@ -555,7 +557,7 @@ export async function connectSavedBluetoothPrinter(
     )
   }
 
-  console.log(
+  plog.log(
     "[Bluetooth Saved] Writable characteristic:",
     writableCharacteristic.uuid
   )

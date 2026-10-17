@@ -1,3 +1,5 @@
+import { plog } from "@/lib/printer/logger"
+
 export type UsbPrinterConnection = {
   device: USBDevice
   interfaceNumber: number
@@ -5,13 +7,13 @@ export type UsbPrinterConnection = {
 }
 
 function getUSB() {
-  console.log("[USB] getUSB() called")
+  plog.log("[USB] getUSB() called")
 
   if (
     typeof navigator === "undefined" ||
     !("usb" in navigator)
   ) {
-    console.error(
+    plog.error(
       "[USB] WebUSB tidak tersedia di browser."
     )
 
@@ -20,7 +22,7 @@ function getUSB() {
     )
   }
 
-  console.log(
+  plog.log(
     "[USB] WebUSB tersedia.",
     navigator.usb
   )
@@ -31,7 +33,7 @@ function getUSB() {
 function getUsbErrorMessage(
   error: unknown
 ) {
-  console.error(
+  plog.error(
     "[USB] getUsbErrorMessage() error:",
     error
   )
@@ -39,7 +41,7 @@ function getUsbErrorMessage(
   if (
     error instanceof DOMException
   ) {
-    console.error(
+    plog.error(
       "[USB] DOMException:",
       {
         name: error.name,
@@ -83,7 +85,7 @@ function getUsbErrorMessage(
   }
 
   if (error instanceof Error) {
-    console.error(
+    plog.error(
       "[USB] Error:",
       {
         name: error.name,
@@ -103,7 +105,7 @@ function getUsbErrorMessage(
     return error.message
   }
 
-  console.error(
+  plog.error(
     "[USB] Unknown error:",
     error
   )
@@ -114,15 +116,15 @@ function getUsbErrorMessage(
 async function openUsbPrinter(
   device: USBDevice
 ): Promise<UsbPrinterConnection> {
-  console.log(
+  plog.log(
     "[USB] ========================================"
   )
 
-  console.log(
+  plog.log(
     "[USB] openUsbPrinter() START"
   )
 
-  console.log(
+  plog.log(
     "[USB] Device information:",
     {
       vendorId:
@@ -155,19 +157,19 @@ async function openUsbPrinter(
      * ========================================================
      */
 
-    console.log(
+    plog.log(
       "[USB] STEP 1: Checking device.opened:",
       device.opened
     )
 
     if (!device.opened) {
-      console.log(
+      plog.log(
         "[USB] STEP 1: Calling device.open()..."
       )
 
       await device.open()
 
-      console.log(
+      plog.log(
         "[USB] STEP 1 SUCCESS: device.open() berhasil.",
         {
           opened:
@@ -178,7 +180,7 @@ async function openUsbPrinter(
         }
       )
     } else {
-      console.log(
+      plog.log(
         "[USB] STEP 1 SKIP: Device sudah terbuka."
       )
     }
@@ -189,28 +191,28 @@ async function openUsbPrinter(
      * ========================================================
      */
 
-    console.log(
+    plog.log(
       "[USB] STEP 2: Checking configuration...",
       device.configuration
     )
 
     if (!device.configuration) {
-      console.log(
+      plog.log(
         "[USB] STEP 2: Configuration kosong."
       )
 
-      console.log(
+      plog.log(
         "[USB] STEP 2: Calling selectConfiguration(1)..."
       )
 
       await device.selectConfiguration(1)
 
-      console.log(
+      plog.log(
         "[USB] STEP 2 SUCCESS: selectConfiguration(1) berhasil.",
         device.configuration
       )
     } else {
-      console.log(
+      plog.log(
         "[USB] STEP 2 SKIP: Configuration sudah tersedia."
       )
     }
@@ -219,7 +221,7 @@ async function openUsbPrinter(
       device.configuration
 
     if (!configuration) {
-      console.error(
+      plog.error(
         "[USB] STEP 2 ERROR: USB configuration tidak ditemukan."
       )
 
@@ -228,7 +230,7 @@ async function openUsbPrinter(
       )
     }
 
-    console.log(
+    plog.log(
       "[USB] Configuration:",
       {
         configurationValue:
@@ -248,13 +250,13 @@ async function openUsbPrinter(
      * ========================================================
      */
 
-    console.log(
+    plog.log(
       "[USB] STEP 3: Semua USB interfaces:"
     )
 
     configuration.interfaces.forEach(
       (item, index) => {
-        console.log(
+        plog.log(
           `[USB] Interface ${index}:`,
           {
             interfaceNumber:
@@ -295,7 +297,7 @@ async function openUsbPrinter(
      * ========================================================
      */
 
-    console.log(
+    plog.log(
       "[USB] STEP 4: Mencari printer interface (class 7)..."
     )
 
@@ -307,7 +309,7 @@ async function openUsbPrinter(
       )
 
     if (!usbInterface) {
-      console.error(
+      plog.error(
         "[USB] STEP 4 ERROR: Printer interface tidak ditemukan.",
         configuration.interfaces.map(
           (item) => ({
@@ -338,7 +340,7 @@ async function openUsbPrinter(
       )
     }
 
-    console.log(
+    plog.log(
       "[USB] STEP 4 SUCCESS: Printer interface ditemukan:",
       {
         interfaceNumber:
@@ -368,11 +370,11 @@ async function openUsbPrinter(
      * ========================================================
      */
 
-    console.log(
+    plog.log(
       "[USB] STEP 5: Mencari BULK OUT endpoint..."
     )
 
-    console.log(
+    plog.log(
       "[USB] STEP 5: Available endpoints:",
       usbInterface.alternate.endpoints
     )
@@ -385,7 +387,7 @@ async function openUsbPrinter(
       )
 
     if (!endpoint) {
-      console.error(
+      plog.error(
         "[USB] STEP 5 ERROR: BULK OUT endpoint tidak ditemukan.",
         {
           endpoints:
@@ -399,7 +401,7 @@ async function openUsbPrinter(
       )
     }
 
-    console.log(
+    plog.log(
       "[USB] STEP 5 SUCCESS: Endpoint ditemukan:",
       {
         endpointNumber:
@@ -422,7 +424,7 @@ async function openUsbPrinter(
      * ========================================================
      */
 
-    console.log(
+    plog.log(
       "[USB] STEP 6: Akan menjalankan claimInterface()...",
       {
         interfaceNumber:
@@ -446,7 +448,7 @@ async function openUsbPrinter(
     )
 
     try {
-      console.log(
+      plog.log(
         "[USB] STEP 6: Calling device.claimInterface()..."
       )
 
@@ -454,11 +456,11 @@ async function openUsbPrinter(
         usbInterface.interfaceNumber
       )
 
-      console.log(
+      plog.log(
         "[USB] STEP 6 SUCCESS: claimInterface() berhasil."
       )
     } catch (claimError) {
-      console.error(
+      plog.error(
         "[USB] STEP 6 ERROR: claimInterface() GAGAL.",
         claimError
       )
@@ -466,7 +468,7 @@ async function openUsbPrinter(
       if (
         claimError instanceof DOMException
       ) {
-        console.error(
+        plog.error(
           "[USB] claimInterface DOMException:",
           {
             name:
@@ -485,7 +487,7 @@ async function openUsbPrinter(
       } else if (
         claimError instanceof Error
       ) {
-        console.error(
+        plog.error(
           "[USB] claimInterface Error:",
           {
             name:
@@ -509,15 +511,15 @@ async function openUsbPrinter(
      * ========================================================
      */
 
-    console.log(
+    plog.log(
       "[USB] ========================================"
     )
 
-    console.log(
+    plog.log(
       "[USB] openUsbPrinter() SUCCESS"
     )
 
-    console.log(
+    plog.log(
       "[USB] Connection:",
       {
         vendorId:
@@ -537,7 +539,7 @@ async function openUsbPrinter(
       }
     )
 
-    console.log(
+    plog.log(
       "[USB] ========================================"
     )
 
@@ -551,15 +553,15 @@ async function openUsbPrinter(
         endpoint.endpointNumber,
     }
   } catch (error) {
-    console.error(
+    plog.error(
       "[USB] ========================================"
     )
 
-    console.error(
+    plog.error(
       "[USB] openUsbPrinter() FAILED"
     )
 
-    console.error(
+    plog.error(
       "[USB] Device state saat error:",
       {
         vendorId:
@@ -585,7 +587,7 @@ async function openUsbPrinter(
       }
     )
 
-    console.error(
+    plog.error(
       "[USB] Original error:",
       error
     )
@@ -593,7 +595,7 @@ async function openUsbPrinter(
     if (
       error instanceof DOMException
     ) {
-      console.error(
+      plog.error(
         "[USB] DOMException detail:",
         {
           name:
@@ -612,7 +614,7 @@ async function openUsbPrinter(
     } else if (
       error instanceof Error
     ) {
-      console.error(
+      plog.error(
         "[USB] Error detail:",
         {
           name:
@@ -633,31 +635,31 @@ async function openUsbPrinter(
      * ========================================================
      */
 
-    console.log(
+    plog.log(
       "[USB] Cleanup: device.opened =",
       device.opened
     )
 
     try {
       if (device.opened) {
-        console.log(
+        plog.log(
           "[USB] Cleanup: calling device.close()..."
         )
 
         await device.close()
 
-        console.log(
+        plog.log(
           "[USB] Cleanup SUCCESS: device.close() berhasil."
         )
       }
     } catch (closeError) {
-      console.warn(
+      plog.warn(
         "[USB] Cleanup ERROR: gagal close device.",
         closeError
       )
     }
 
-    console.error(
+    plog.error(
       "[USB] ========================================"
     )
 
@@ -668,22 +670,22 @@ async function openUsbPrinter(
 }
 
 export async function connectUsbPrinter(): Promise<UsbPrinterConnection> {
-  console.log(
+  plog.log(
     "[USB] ========================================"
   )
 
-  console.log(
+  plog.log(
     "[USB] connectUsbPrinter() START"
   )
 
   const usb = getUSB()
 
-  console.log(
+  plog.log(
     "[USB] WebUSB object:",
     usb
   )
 
-  console.log(
+  plog.log(
     "[USB] Browser information:",
     {
       userAgent:
@@ -703,7 +705,7 @@ export async function connectUsbPrinter(): Promise<UsbPrinterConnection> {
     }
   )
 
-  console.log(
+  plog.log(
     "[USB] Requesting USB device..."
   )
 
@@ -714,7 +716,7 @@ export async function connectUsbPrinter(): Promise<UsbPrinterConnection> {
      * klik tombol "Pilih Printer USB".
      */
 
-    console.log(
+    plog.log(
       "[USB] STEP REQUEST DEVICE: Calling requestDevice()..."
     )
 
@@ -723,7 +725,7 @@ export async function connectUsbPrinter(): Promise<UsbPrinterConnection> {
         filters: [],
       })
 
-    console.log(
+    plog.log(
       "[USB] STEP REQUEST DEVICE SUCCESS:",
       {
         vendorId:
@@ -761,7 +763,7 @@ export async function connectUsbPrinter(): Promise<UsbPrinterConnection> {
       }
     )
 
-    console.log(
+    plog.log(
       "[USB] Passing device to openUsbPrinter()..."
     )
 
@@ -770,26 +772,26 @@ export async function connectUsbPrinter(): Promise<UsbPrinterConnection> {
         device
       )
 
-    console.log(
+    plog.log(
       "[USB] connectUsbPrinter() SUCCESS:",
       connection
     )
 
-    console.log(
+    plog.log(
       "[USB] ========================================"
     )
 
     return connection
   } catch (error) {
-    console.error(
+    plog.error(
       "[USB] ========================================"
     )
 
-    console.error(
+    plog.error(
       "[USB] connectUsbPrinter() FAILED"
     )
 
-    console.error(
+    plog.error(
       "[USB] Error:",
       error
     )
@@ -797,7 +799,7 @@ export async function connectUsbPrinter(): Promise<UsbPrinterConnection> {
     if (
       error instanceof DOMException
     ) {
-      console.error(
+      plog.error(
         "[USB] DOMException:",
         {
           name:
@@ -816,7 +818,7 @@ export async function connectUsbPrinter(): Promise<UsbPrinterConnection> {
     } else if (
       error instanceof Error
     ) {
-      console.error(
+      plog.error(
         "[USB] Error detail:",
         {
           name:
@@ -831,7 +833,7 @@ export async function connectUsbPrinter(): Promise<UsbPrinterConnection> {
       )
     }
 
-    console.error(
+    plog.error(
       "[USB] ========================================"
     )
 
@@ -848,15 +850,15 @@ export async function connectSavedUsbPrinter(
     serialNumber?: string | null
   }
 ): Promise<UsbPrinterConnection> {
-  console.log(
+  plog.log(
     "[USB] ========================================"
   )
 
-  console.log(
+  plog.log(
     "[USB] connectSavedUsbPrinter() START"
   )
 
-  console.log(
+  plog.log(
     "[USB] Saved printer config:",
     {
       vendorId:
@@ -885,14 +887,14 @@ export async function connectSavedUsbPrinter(
   const usb = getUSB()
 
   try {
-    console.log(
+    plog.log(
       "[USB] STEP SAVED 1: Calling usb.getDevices()..."
     )
 
     const devices =
       await usb.getDevices()
 
-    console.log(
+    plog.log(
       "[USB] STEP SAVED 1 SUCCESS: Authorized devices:",
       devices.map(
         (device) => ({
@@ -932,13 +934,13 @@ export async function connectSavedUsbPrinter(
       )
     )
 
-    console.log(
+    plog.log(
       "[USB] STEP SAVED 2: Searching matching device..."
     )
 
     const device = devices.find(
       (item) => {
-        console.log(
+        plog.log(
           "[USB] Checking device:",
           {
             vendorId:
@@ -987,7 +989,7 @@ export async function connectSavedUsbPrinter(
     )
 
     if (!device) {
-      console.error(
+      plog.error(
         "[USB] STEP SAVED 2 ERROR: Matching device tidak ditemukan."
       )
 
@@ -996,7 +998,7 @@ export async function connectSavedUsbPrinter(
       )
     }
 
-    console.log(
+    plog.log(
       "[USB] STEP SAVED 2 SUCCESS: Saved printer found:",
       {
         vendorId:
@@ -1019,7 +1021,7 @@ export async function connectSavedUsbPrinter(
       }
     )
 
-    console.log(
+    plog.log(
       "[USB] STEP SAVED 3: Passing saved device to openUsbPrinter()..."
     )
 
@@ -1028,26 +1030,26 @@ export async function connectSavedUsbPrinter(
         device
       )
 
-    console.log(
+    plog.log(
       "[USB] connectSavedUsbPrinter() SUCCESS:",
       connection
     )
 
-    console.log(
+    plog.log(
       "[USB] ========================================"
     )
 
     return connection
   } catch (error) {
-    console.error(
+    plog.error(
       "[USB] ========================================"
     )
 
-    console.error(
+    plog.error(
       "[USB] connectSavedUsbPrinter() FAILED"
     )
 
-    console.error(
+    plog.error(
       "[USB] Error:",
       error
     )
@@ -1055,7 +1057,7 @@ export async function connectSavedUsbPrinter(
     if (
       error instanceof DOMException
     ) {
-      console.error(
+      plog.error(
         "[USB] DOMException:",
         {
           name:
@@ -1074,7 +1076,7 @@ export async function connectSavedUsbPrinter(
     } else if (
       error instanceof Error
     ) {
-      console.error(
+      plog.error(
         "[USB] Error detail:",
         {
           name:
@@ -1089,7 +1091,7 @@ export async function connectSavedUsbPrinter(
       )
     }
 
-    console.error(
+    plog.error(
       "[USB] ========================================"
     )
 
@@ -1102,15 +1104,15 @@ export async function connectSavedUsbPrinter(
 export async function printUsbTest(
   connection: UsbPrinterConnection
 ) {
-  console.log(
+  plog.log(
     "[USB] ========================================"
   )
 
-  console.log(
+  plog.log(
     "[USB] printUsbTest() START"
   )
 
-  console.log(
+  plog.log(
     "[USB] Connection:",
     {
       opened:
@@ -1136,7 +1138,7 @@ export async function printUsbTest(
   if (
     !connection.device.opened
   ) {
-    console.error(
+    plog.error(
       "[USB] printUsbTest() ERROR: Device tidak terbuka."
     )
 
@@ -1193,7 +1195,7 @@ export async function printUsbTest(
       0x00,
     ])
 
-  console.log(
+  plog.log(
     "[USB] Print data:",
     {
       byteLength:
@@ -1208,7 +1210,7 @@ export async function printUsbTest(
   )
 
   try {
-    console.log(
+    plog.log(
       "[USB] STEP PRINT: Calling transferOut()..."
     )
 
@@ -1218,22 +1220,22 @@ export async function printUsbTest(
         data
       )
 
-    console.log(
+    plog.log(
       "[USB] STEP PRINT SUCCESS: transferOut() berhasil.",
       result
     )
 
-    console.log(
+    plog.log(
       "[USB] printUsbTest() SUCCESS"
     )
 
-    console.log(
+    plog.log(
       "[USB] ========================================"
     )
 
     return result
   } catch (error) {
-    console.error(
+    plog.error(
       "[USB] STEP PRINT ERROR: transferOut() gagal.",
       error
     )
@@ -1241,7 +1243,7 @@ export async function printUsbTest(
     if (
       error instanceof DOMException
     ) {
-      console.error(
+      plog.error(
         "[USB] transferOut DOMException:",
         {
           name:
@@ -1260,7 +1262,7 @@ export async function printUsbTest(
     } else if (
       error instanceof Error
     ) {
-      console.error(
+      plog.error(
         "[USB] transferOut Error:",
         {
           name:
@@ -1275,7 +1277,7 @@ export async function printUsbTest(
       )
     }
 
-    console.error(
+    plog.error(
       "[USB] ========================================"
     )
 
@@ -1288,15 +1290,15 @@ export async function printUsbTest(
 export async function disconnectUsbPrinter(
   connection: UsbPrinterConnection
 ) {
-  console.log(
+  plog.log(
     "[USB] ========================================"
   )
 
-  console.log(
+  plog.log(
     "[USB] disconnectUsbPrinter() START"
   )
 
-  console.log(
+  plog.log(
     "[USB] Connection:",
     {
       opened:
@@ -1323,7 +1325,7 @@ export async function disconnectUsbPrinter(
     if (
       connection.device.opened
     ) {
-      console.log(
+      plog.log(
         "[USB] STEP DISCONNECT 1: Calling releaseInterface()...",
         {
           interfaceNumber:
@@ -1335,16 +1337,16 @@ export async function disconnectUsbPrinter(
         connection.interfaceNumber
       )
 
-      console.log(
+      plog.log(
         "[USB] STEP DISCONNECT 1 SUCCESS: releaseInterface() berhasil."
       )
     } else {
-      console.log(
+      plog.log(
         "[USB] STEP DISCONNECT 1 SKIP: Device sudah tertutup."
       )
     }
   } catch (error) {
-    console.warn(
+    plog.warn(
       "[USB] STEP DISCONNECT 1 ERROR: releaseInterface() gagal.",
       error
     )
@@ -1352,7 +1354,7 @@ export async function disconnectUsbPrinter(
     if (
       error instanceof DOMException
     ) {
-      console.warn(
+      plog.warn(
         "[USB] releaseInterface DOMException:",
         {
           name:
@@ -1372,22 +1374,22 @@ export async function disconnectUsbPrinter(
     if (
       connection.device.opened
     ) {
-      console.log(
+      plog.log(
         "[USB] STEP DISCONNECT 2: Calling device.close()..."
       )
 
       await connection.device.close()
 
-      console.log(
+      plog.log(
         "[USB] STEP DISCONNECT 2 SUCCESS: device.close() berhasil."
       )
     } else {
-      console.log(
+      plog.log(
         "[USB] STEP DISCONNECT 2 SKIP: Device sudah tertutup."
       )
     }
   } catch (error) {
-    console.warn(
+    plog.warn(
       "[USB] STEP DISCONNECT 2 ERROR: device.close() gagal.",
       error
     )
@@ -1395,7 +1397,7 @@ export async function disconnectUsbPrinter(
     if (
       error instanceof DOMException
     ) {
-      console.warn(
+      plog.warn(
         "[USB] close DOMException:",
         {
           name:
@@ -1411,11 +1413,11 @@ export async function disconnectUsbPrinter(
     }
   }
 
-  console.log(
+  plog.log(
     "[USB] disconnectUsbPrinter() COMPLETE"
   )
 
-  console.log(
+  plog.log(
     "[USB] ========================================"
   )
 }

@@ -1,5 +1,7 @@
 "use client"
 
+import { plog } from "@/lib/printer/logger"
+
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -271,7 +273,7 @@ export default function PrinterClient({
 
       return true
     } catch (error) {
-      console.error(
+      plog.error(
         "[Delete Printer]",
         error
       )
@@ -330,7 +332,7 @@ export default function PrinterClient({
 
       router.refresh()
     } catch (error) {
-      console.error(
+      plog.error(
         "[Set Default Printer]",
         error
       )
@@ -426,7 +428,7 @@ export default function PrinterClient({
         )
       }
     } catch (error) {
-      console.error(
+      plog.error(
         "[USB] Disconnect error:",
         error
       )
@@ -439,7 +441,7 @@ export default function PrinterClient({
         )
       }
     } catch (error) {
-      console.error(
+      plog.error(
         "[Bluetooth] Disconnect error:",
         error
       )
@@ -509,7 +511,7 @@ export default function PrinterClient({
           connection.device.productName,
       })
     } catch (error) {
-      console.error(
+      plog.error(
         "[USB] Connect error:",
         error
       )
@@ -543,7 +545,7 @@ export default function PrinterClient({
         usbConnection
       )
     } catch (error) {
-      console.error(
+      plog.error(
         "[USB] Test print error:",
         error
       )
@@ -623,7 +625,7 @@ export default function PrinterClient({
         window.location.reload()
       }, 500)
     } catch (error) {
-      console.error(
+      plog.error(
         "[USB] Save printer error:",
         error
       )
@@ -684,7 +686,7 @@ export default function PrinterClient({
             ?.uuid ?? null,
       })
     } catch (error) {
-      console.error(
+      plog.error(
         "[Bluetooth] Connect error:",
         error
       )
@@ -721,7 +723,7 @@ export default function PrinterClient({
         bluetoothConnection
       )
     } catch (error) {
-      console.error(
+      plog.error(
         "[Bluetooth] Test print error:",
         error
       )
@@ -829,7 +831,7 @@ export default function PrinterClient({
         window.location.reload()
       }, 500)
     } catch (error) {
-      console.error(
+      plog.error(
         "[Bluetooth] Save printer error:",
         error
       )
@@ -887,7 +889,7 @@ export default function PrinterClient({
         )
       }
     } catch (error) {
-      console.error(
+      plog.error(
         "[Saved USB Printer] Test print error:",
         error
       )
@@ -951,7 +953,7 @@ export default function PrinterClient({
         "Test print berhasil dikirim."
       )
     } catch (error) {
-      console.error(
+      plog.error(
         "[Saved Bluetooth Printer] Test print error:",
         error
       )
@@ -974,7 +976,7 @@ export default function PrinterClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
             Printer
@@ -985,16 +987,26 @@ export default function PrinterClient({
           </p>
         </div>
 
-        {canManagePrinter ? (
-          <Button
-            type="button"
-            onClick={
-              handleOpenAddPrinter
-            }
-          >
-            Tambah Printer
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <a href="/download/kasir-pusatbelanja.apk" download>Unduh APK</a>
           </Button>
-        ) : null}
+
+          <Button asChild variant="outline">
+            <a href="/kasir/pengaturan/printer/log">Log Printer</a>
+          </Button>
+
+          {canManagePrinter ? (
+            <Button
+              type="button"
+              onClick={
+                handleOpenAddPrinter
+              }
+            >
+              Tambah Printer
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {printers.length === 0 ? (

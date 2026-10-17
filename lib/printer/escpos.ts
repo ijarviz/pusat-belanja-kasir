@@ -1,3 +1,5 @@
+import { plog } from "@/lib/printer/logger"
+
 import type {
   ReceiptData,
 } from "@/lib/transactions/receipt"
@@ -568,7 +570,7 @@ export async function buildKasirReceipt(
         ...text("")
       )
     } catch (error) {
-      console.error(
+      plog.error(
         "[ESC/POS] Gagal print logo:",
         error
       )
