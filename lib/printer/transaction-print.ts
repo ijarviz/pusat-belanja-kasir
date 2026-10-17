@@ -136,6 +136,9 @@ async function buildTransactionReceipt(
     outletAddress:
       outlet.address ?? null,
 
+    outletUrl:
+      outlet.url ?? null,
+
     orderDate:
       data.order_date,
 

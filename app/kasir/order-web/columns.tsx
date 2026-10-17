@@ -27,6 +27,7 @@ import { DataTableColumnHeader } from "@/components/data-table-column-header"
 import { ImageDefault } from "@/components/image-default"
 import { TrackingDialog } from "@/components/tracking-dialog"
 
+import { shipmentStatus } from "@/lib/transactions/stage"
 import type { Transaction } from "@/lib/transactions/types"
 import { getTotalItems, formatPaymentMethod } from "@/lib/transactions/utils"
 import { formatCurrency } from "@/lib/utils/format-currency"
@@ -258,6 +259,7 @@ export function getColumns(
 
       const courier = data.shipping_courier || "-"
       const service = data.shipping_service || "-"
+      const shipment = shipmentStatus(data)
 
       return (
         <div className="text-sm">
@@ -265,29 +267,28 @@ export function getColumns(
           <div className="text-xs text-muted-foreground">
             {service}
           </div>
-          {data.awb ? (
+          {data.awb && (
             <div className="mt-1 text-xs">
               <span className="text-muted-foreground">AWB: </span>
               <span className="font-mono font-semibold">{data.awb}</span>
             </div>
-          ) : data.payment_status === "paid" && data.status !== "cancelled" ? (
+          )}
+          {!data.awb && data.payment_status === "paid" && data.status !== "cancelled" && (
             <div className="mt-1 text-xs text-amber-600">
               {data.shipping_order_status === "failed"
                 ? `Resi gagal: ${data.shipping_order_error || "coba lagi otomatis"}`
                 : "Menunggu resi..."}
             </div>
-          ) : data.shipping_order_status ? null : (
-            <div className="text-xs text-muted-foreground">-</div>
           )}
-          {/* Status pengiriman (dulu kolom Shipment), di bawah AWB. "failed"
-              tanpa AWB sudah tampil sebagai "Resi gagal" di atas. */}
-          {data.shipping_order_status &&
-            !(data.shipping_order_status === "failed" && !data.awb) && (
-              <div className="mt-0.5 text-xs text-muted-foreground">
-                Status:{" "}
-                <span className="font-medium text-foreground">{data.shipping_order_status}</span>
-              </div>
-            )}
+          {/* Badge status pengiriman (id status AL, lib/transactions/stage.ts).
+              Order lama pra-AL tidak punya id: tampilkan teks mentahnya. */}
+          {shipment ? (
+            <span className={`mt-1.5 inline-block rounded px-2 py-0.5 text-[11px] font-semibold uppercase ${shipment.className}`}>
+              {shipment.label}
+            </span>
+          ) : (
+            <div className="mt-1 text-xs text-muted-foreground">{data.shipping_order_status ?? "-"}</div>
+          )}
         </div>
       )
     },

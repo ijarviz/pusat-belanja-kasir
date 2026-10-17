@@ -15,6 +15,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
@@ -42,6 +43,13 @@ export function NavMain({
 }) {
 
   const pathname = usePathname()
+  const { isMobile, setOpenMobile } = useSidebar()
+
+  // Di HP sidebar berupa panel geser; tutup setelah memilih menu karena
+  // navigasi client-side tidak memuat ulang halaman.
+  const closeOnMobile = () => {
+    if (isMobile) setOpenMobile(false)
+  }
 
   return (
     <SidebarGroup>
@@ -64,7 +72,7 @@ export function NavMain({
                 >
                   {/* Navigasi client-side: halaman tidak dimuat ulang, jadi
                       koneksi printer Bluetooth/USB di memori tetap ada. */}
-                  <Link href={item.url ?? "#"}>
+                  <Link href={item.url ?? "#"} onClick={closeOnMobile}>
                     {item.icon}
                     <span>{item.title}</span>
                   </Link>
@@ -122,7 +130,7 @@ export function NavMain({
                             isActive={isSubActive}
                             className={isSubActive ? "font-semibold" : ""}
                           >
-                            <Link href={subItem.url}>
+                            <Link href={subItem.url} onClick={closeOnMobile}>
                               <span>{subItem.title}</span>
                             </Link>
                           </SidebarMenuSubButton>

@@ -3,7 +3,7 @@ import { queryOne } from "@/lib/db"
 import { getActiveOutlet } from "@/lib/outlet"
 import { normalizeTransaction } from "@/lib/transactions/queries"
 import { formatCurrency } from "@/lib/utils/format-currency"
-import { formatReceiptPaymentMethod } from "@/lib/transactions/receipt"
+import { formatReceiptPaymentMethod, receiptFooterText } from "@/lib/transactions/receipt"
 
 type PageProps = {
   params: Promise<{
@@ -473,7 +473,7 @@ export default async function OrderPage({
         {/* FOOTER */}
 
         <footer className="receipt-footer">
-          Terima kasih telah berbelanja di {activeOutlet.name}
+          {receiptFooterText(activeOutlet.name, activeOutlet.url)}
         </footer>
 
       </main>

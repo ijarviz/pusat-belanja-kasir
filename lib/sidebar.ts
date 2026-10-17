@@ -4,7 +4,7 @@ import { cookies } from "next/headers"
 
 import { queryOne } from "@/lib/db"
 import { getSessionUser } from "@/lib/session"
-import { CREATE_STAGE_SQL } from "@/lib/transactions/stage"
+import { NEEDS_SHIPPING_SQL } from "@/lib/transactions/stage"
 import { fetchUserOutlets } from "./outlet-queries"
 
 export async function getSidebarData() {
@@ -36,22 +36,22 @@ export async function getSidebarData() {
     outlets,
 
     // Badge merah di menu (id menu -> jumlah). orderWeb: semua order web
-    // berstatus Create (all time) yang menunggu dipickup kurir.
+    // di tab "Perlu Dikirim" (all time), yang harus segera diproses.
     badges: {
-      orderWeb: activeOutlet ? await countCreateOrders(activeOutlet.id) : 0,
+      orderWeb: activeOutlet ? await countNeedsShipping(activeOutlet.id) : 0,
     } as Record<string, number>,
   }
 }
 
-async function countCreateOrders(outletId: string) {
+async function countNeedsShipping(outletId: string) {
   try {
     const row = await queryOne<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM transactions WHERE outlet_id = ? AND ${CREATE_STAGE_SQL}`,
+      `SELECT COUNT(*) AS n FROM transactions WHERE outlet_id = ? AND ${NEEDS_SHIPPING_SQL}`,
       [outletId]
     )
     return Number(row?.n ?? 0)
   } catch (error) {
-    console.error("countCreateOrders:", error)
+    console.error("countNeedsShipping:", error)
     return 0
   }
 }

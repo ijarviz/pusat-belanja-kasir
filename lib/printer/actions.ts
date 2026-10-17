@@ -46,8 +46,9 @@ export async function getReceiptOutletAction(outletId: string) {
     name: string
     address: string | null
     image_url: string | null
+    url: string | null
   }>(
-    "SELECT id, name, address, image_url FROM outlets WHERE id = ?",
+    "SELECT id, name, address, image_url, url FROM outlets WHERE id = ?",
     [activeOutlet.id]
   )
 }

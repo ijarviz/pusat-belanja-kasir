@@ -49,9 +49,9 @@ import { DateRange } from "react-day-picker"
 import { format } from "date-fns"
 import { getColumns } from "./columns"
 import {
-  DEFAULT_ORDER_STAGE,
-  ORDER_STAGES,
-  orderStage,
+  DEFAULT_ORDER_TAB,
+  ORDER_TABS,
+  orderTab,
 } from "@/lib/transactions/stage"
 import { cn } from "@/lib/utils"
 
@@ -92,12 +92,12 @@ export function DataTable({
   const initialPage =
     Number(searchParams.get("page") ?? 1)
 
-  // Tab tahap order; default Create (perlu segera diproses untuk pickup).
+  // Tab status order; default Perlu Dikirim (harus segera diproses).
   const [stage, setStage] = React.useState<string>(
     // "semua" di URL karena updateURL membuang nilai "all".
     searchParams.get("tahap") === "semua"
       ? "all"
-      : (searchParams.get("tahap") ?? DEFAULT_ORDER_STAGE)
+      : (searchParams.get("tahap") ?? DEFAULT_ORDER_TAB)
   )
 
   /*
@@ -344,7 +344,7 @@ export function DataTable({
   const stageCounts = React.useMemo(() => {
     const counts: Record<string, number> = {}
     for (const item of filteredData) {
-      const key = orderStage(item)
+      const key = orderTab(item)
       counts[key] = (counts[key] ?? 0) + 1
     }
     return counts
@@ -354,19 +354,19 @@ export function DataTable({
     () =>
       stage === "all"
         ? filteredData
-        : filteredData.filter((item) => orderStage(item) === stage),
+        : filteredData.filter((item) => orderTab(item) === stage),
     [filteredData, stage]
   )
 
-  // Tab tanpa data disembunyikan, kecuali Semua, Create dan tab aktif.
+  // Semua tab selalu tampil; Arsip (order lama pra-AL) hanya kalau ada isinya.
   const stageTabs = [
     { key: "all", label: "Semua", count: filteredData.length },
-    ...ORDER_STAGES.map((s) => ({
+    ...ORDER_TABS.map((s) => ({
       key: s.key as string,
       label: s.label as string,
       count: stageCounts[s.key] ?? 0,
     })).filter(
-      (s) => s.count > 0 || s.key === DEFAULT_ORDER_STAGE || s.key === stage
+      (s) => s.key !== "arsip" || s.count > 0 || s.key === stage
     ),
   ]
 
@@ -376,7 +376,7 @@ export function DataTable({
     setPagination((prev) => ({ ...prev, pageIndex: 0 }))
     updateURL({
       tahap:
-        next === DEFAULT_ORDER_STAGE
+        next === DEFAULT_ORDER_TAB
           ? null
           : next === "all"
             ? "semua"

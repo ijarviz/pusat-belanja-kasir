@@ -13,6 +13,8 @@ export type ReceiptData = {
 
   outletName: string
   outletAddress: string | null
+  // outlets.url (mis. https://sunnozy.id) untuk ajakan belanja online.
+  outletUrl?: string | null
 
   orderDate: string
 
@@ -46,6 +48,34 @@ export function formatReceiptPaymentMethod(
   }
 
   return map[value] ?? value
+}
+
+/*
+ * Teks penutup struk (cetak ESC/POS, /order/[id], dan /invoice di store):
+ * "Terima kasih telah berbelanja di Sunnozy. Belanja online produk
+ * lainnya di www.sunnozy.id".
+ */
+export function receiptFooterText(
+  outletName: string,
+  outletUrl?: string | null
+) {
+  const thanks = `Terima kasih telah berbelanja di ${outletName}.`
+  const site = displaySite(outletUrl)
+
+  return site
+    ? `${thanks} Belanja online produk lainnya di ${site}`
+    : thanks
+}
+
+// https://sunnozy.id/ -> www.sunnozy.id
+function displaySite(url?: string | null) {
+  if (!url) return null
+  try {
+    const host = new URL(url.includes("://") ? url : `https://${url}`).hostname
+    return host.startsWith("www.") ? host : `www.${host}`
+  } catch {
+    return null
+  }
 }
 
 export function createReceiptData(

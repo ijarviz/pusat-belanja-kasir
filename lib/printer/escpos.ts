@@ -1,7 +1,8 @@
 import { plog } from "@/lib/printer/logger"
 
-import type {
-  ReceiptData,
+import {
+  receiptFooterText,
+  type ReceiptData,
 } from "@/lib/transactions/receipt"
 
 const encoder = new TextEncoder()
@@ -769,11 +770,18 @@ export async function buildKasirReceipt(
     ...divider()
   )
 
-  bytes.push(
-    ...center(
-      `Terima kasih telah berbelanja di ${data.outletName}`
+  for (
+    const line of wrapText(
+      receiptFooterText(
+        data.outletName,
+        data.outletUrl
+      )
     )
-  )
+  ) {
+    bytes.push(
+      ...center(line)
+    )
+  }
 
   // =====================================
   // FEED + CUT
