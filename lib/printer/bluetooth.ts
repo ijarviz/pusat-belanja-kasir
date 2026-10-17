@@ -19,6 +19,18 @@ export type BluetoothPrinterConnection = {
     | null
 }
 
+/*
+ * Perangkat Bluetooth yang sudah dipilih user di sesi halaman ini. Chrome
+ * Android tidak punya navigator.bluetooth.getDevices(), jadi tanpa ini
+ * setiap cetak harus memilih perangkat lagi. Bertahan selama halaman tidak
+ * dimuat ulang (sidebar memakai navigasi client-side, lihat nav-main.tsx).
+ */
+const knownDevices = new Map<string, BluetoothDevice>()
+
+function rememberDevice(device: BluetoothDevice) {
+  knownDevices.set(device.id, device)
+}
+
 function getBluetooth() {
   if (
     typeof navigator === "undefined" ||
@@ -98,6 +110,8 @@ export async function connectBluetoothPrinter(): Promise<BluetoothPrinterConnect
       name: device.name,
     }
   )
+
+  rememberDevice(device)
 
   if (!device.gatt) {
     throw new Error(
@@ -422,46 +436,10 @@ export async function connectSavedBluetoothPrinter(
     )
   }
 
-  if (
-    typeof bluetooth.getDevices !==
-    "function"
-  ) {
-    throw new Error(
-      "Browser ini belum mendukung koneksi ulang Bluetooth tanpa memilih perangkat. Silakan hubungkan printer dari Pengaturan Printer terlebih dahulu."
-    )
-  }
-
-  const devices =
-    await bluetooth.getDevices()
-
-  plog.log(
-    "[Bluetooth Saved] Authorized devices:",
-    devices.map((device) => ({
-      id: device.id,
-      name: device.name,
-    }))
+  const device = await findSavedDevice(
+    bluetooth,
+    config
   )
-
-  const device =
-    devices.find(
-      (item) =>
-        item.id === config.deviceId
-    ) ??
-    (
-      config.deviceName
-        ? devices.find(
-            (item) =>
-              item.name ===
-              config.deviceName
-          )
-        : undefined
-    )
-
-  if (!device) {
-    throw new Error(
-      `Printer Bluetooth "${config.deviceName ?? "tersimpan"}" belum diizinkan oleh browser. Silakan buka Pengaturan Printer dan hubungkan printer sekali terlebih dahulu.`
-    )
-  }
 
   plog.log(
     "[Bluetooth Saved] Device found:",
@@ -471,10 +449,28 @@ export async function connectSavedBluetoothPrinter(
     }
   )
 
-  const server =
-    device.gatt?.connected
-      ? device.gatt
-      : await device.gatt?.connect()
+  plog.log(
+    "[Bluetooth Saved] GATT status:",
+    { connected: device.gatt?.connected ?? false }
+  )
+
+  let server: BluetoothRemoteGATTServer | undefined
+
+  try {
+    server =
+      device.gatt?.connected
+        ? device.gatt
+        : await device.gatt?.connect()
+  } catch (error) {
+    plog.error(
+      "[Bluetooth Saved] GATT connect failed:",
+      error
+    )
+
+    throw new Error(
+      `Gagal menyambung ke printer "${device.name ?? config.deviceName ?? ""}". Pastikan printer menyala dan dekat dengan perangkat.`
+    )
+  }
 
   if (!server) {
     throw new Error(
@@ -568,4 +564,111 @@ export async function connectSavedBluetoothPrinter(
     services: serviceInfos,
     writableCharacteristic,
   }
+}
+/*
+ * Cari perangkat printer tersimpan, berurutan:
+ *   1. yang sudah dipilih di sesi halaman ini (knownDevices),
+ *   2. navigator.bluetooth.getDevices() (Chrome desktop),
+ *   3. pemilih Bluetooth yang difilter nama printer tersimpan: di Chrome
+ *      Android cukup satu tap. Harus dipanggil dari klik (user gesture).
+ */
+async function findSavedDevice(
+  bluetooth: Bluetooth,
+  config: SavedBluetoothPrinterConfig
+): Promise<BluetoothDevice> {
+  const matches = (device: BluetoothDevice) =>
+    device.id === config.deviceId ||
+    (!!config.deviceName &&
+      device.name === config.deviceName)
+
+  const known = [...knownDevices.values()].find(matches)
+
+  if (known) {
+    plog.log(
+      "[Bluetooth Saved] Pakai perangkat dari sesi ini:",
+      { id: known.id, name: known.name }
+    )
+    return known
+  }
+
+  if (typeof bluetooth.getDevices === "function") {
+    const devices =
+      await bluetooth.getDevices()
+
+    plog.log(
+      "[Bluetooth Saved] Authorized devices:",
+      devices.map((device) => ({
+        id: device.id,
+        name: device.name,
+      }))
+    )
+
+    const device = devices.find(matches)
+
+    if (device) {
+      rememberDevice(device)
+      return device
+    }
+  } else {
+    plog.log(
+      "[Bluetooth Saved] getDevices() tidak tersedia, buka pemilih perangkat"
+    )
+  }
+
+  const optionalServices = [
+    "0000ff00-0000-1000-8000-00805f9b34fb",
+    ...(config.serviceUuid
+      ? [config.serviceUuid.toLowerCase()]
+      : []),
+  ]
+
+  let device: BluetoothDevice
+
+  try {
+    device = await bluetooth.requestDevice(
+      config.deviceName
+        ? {
+            filters: [{ name: config.deviceName }],
+            optionalServices,
+          }
+        : {
+            acceptAllDevices: true,
+            optionalServices,
+          }
+    )
+  } catch (error) {
+    plog.error(
+      "[Bluetooth Saved] requestDevice gagal:",
+      error
+    )
+
+    if (
+      error instanceof DOMException &&
+      error.name === "NotFoundError"
+    ) {
+      throw new Error(
+        `Printer "${config.deviceName ?? "Bluetooth"}" tidak dipilih atau tidak ditemukan. Pastikan printer menyala, lalu pilih printernya saat diminta.`
+      )
+    }
+
+    if (
+      error instanceof DOMException &&
+      error.name === "SecurityError"
+    ) {
+      throw new Error(
+        "Browser meminta printer dipilih langsung dari tombol cetak. Silakan tekan tombol cetak sekali lagi."
+      )
+    }
+
+    throw error
+  }
+
+  plog.log(
+    "[Bluetooth Saved] Device dipilih ulang:",
+    { id: device.id, name: device.name }
+  )
+
+  rememberDevice(device)
+
+  return device
 }

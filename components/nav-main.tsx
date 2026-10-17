@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/sidebar"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 export function NavMain({
@@ -61,10 +62,12 @@ export function NavMain({
                   isActive={item.url === pathname}
                   tooltip={item.title}
                 >
-                  <a href={item.url}>
+                  {/* Navigasi client-side: halaman tidak dimuat ulang, jadi
+                      koneksi printer Bluetooth/USB di memori tetap ada. */}
+                  <Link href={item.url ?? "#"}>
                     {item.icon}
                     <span>{item.title}</span>
-                  </a>
+                  </Link>
                 </SidebarMenuButton>
                 {(badges[item.id] ?? 0) > 0 && (
                   <>
@@ -119,9 +122,9 @@ export function NavMain({
                             isActive={isSubActive}
                             className={isSubActive ? "font-semibold" : ""}
                           >
-                            <a href={subItem.url}>
+                            <Link href={subItem.url}>
                               <span>{subItem.title}</span>
-                            </a>
+                            </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       )

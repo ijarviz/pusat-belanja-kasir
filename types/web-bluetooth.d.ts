@@ -52,13 +52,21 @@ interface BluetoothDevice {
   ): void
 }
 
+interface BluetoothLEScanFilter {
+  name?: string
+  namePrefix?: string
+  services?: BluetoothServiceUUID[]
+}
+
 interface Bluetooth {
   requestDevice(options: {
     acceptAllDevices?: boolean
+    filters?: BluetoothLEScanFilter[]
     optionalServices?: BluetoothServiceUUID[]
   }): Promise<BluetoothDevice>
 
-  getDevices(): Promise<BluetoothDevice[]>
+  // Tidak ada di Chrome Android (hanya desktop / di balik flag).
+  getDevices?(): Promise<BluetoothDevice[]>
 }
 
 interface Navigator {

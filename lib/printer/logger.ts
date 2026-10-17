@@ -60,6 +60,19 @@ function serialize(value: unknown): string {
   }
 }
 
+// APK (TWA) membuka situs dengan referrer android-app://<package>, tapi
+// hanya di halaman pertama; tandanya disimpan untuk halaman berikutnya.
+function openedFromApk() {
+  try {
+    if (document.referrer.startsWith("android-app://")) {
+      sessionStorage.setItem("pb_twa", "1")
+    }
+    return sessionStorage.getItem("pb_twa") === "1"
+  } catch {
+    return document.referrer.startsWith("android-app://")
+  }
+}
+
 // Info perangkat: dikirim sekali per sesi sebagai entri pertama.
 function environment() {
   const nav = navigator as Navigator & { bluetooth?: unknown; usb?: unknown }
@@ -67,8 +80,7 @@ function environment() {
     typeof matchMedia !== "undefined" && matchMedia("(display-mode: standalone)").matches
   return {
     userAgent: navigator.userAgent,
-    // APK (TWA) membuka situs dengan referrer android-app://<package>.
-    twa: document.referrer.startsWith("android-app://"),
+    twa: openedFromApk(),
     referrer: document.referrer || null,
     standalone,
     secureContext: window.isSecureContext,
