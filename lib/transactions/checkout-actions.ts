@@ -1,8 +1,10 @@
 "use server"
 
-import { callProcedure, dbErrorMessage, queryOne, withUserConnection } from "@/lib/db"
+import { callProcedure, dbErrorMessage, execute, queryOne, withUserConnection } from "@/lib/db"
 import { requireOutletAccess } from "@/lib/outlet"
 import { getSessionUser } from "@/lib/session"
+import { voucherBlockReason, voucherDiscount, type VoucherLine } from "@/lib/vouchers/kasir-voucher"
+import { getKasirVoucher } from "@/lib/vouchers/queries"
 
 import { normalizeTransaction } from "./queries"
 import type { Transaction } from "./types"
@@ -27,6 +29,8 @@ export type CreateStoreTransactionInput = {
   products: unknown[]
   subtotal: number
   total: number
+  // Voucher produk (channel Semua / Toko). Diskon dihitung ulang di server.
+  voucherId?: string | null
 }
 
 export async function createStoreTransactionAction(
@@ -50,6 +54,34 @@ export async function createStoreTransactionAction(
     return { success: false, message: "Data produk tidak valid." }
   }
 
+  // Voucher dibaca ulang dari DB dan diskonnya dihitung di sini, bukan dari
+  // angka client. create_store_transaction selalu menyimpan discount 0, jadi
+  // total yang dikirim sudah dipotong lalu discount + kode voucher diisi
+  // setelahnya pada koneksi yang sama.
+  let discount = 0
+  let voucherCode: string | null = null
+
+  if (input.voucherId) {
+    const voucher = await getKasirVoucher(activeOutlet.id, input.voucherId)
+    if (!voucher) {
+      return { success: false, message: "Voucher tidak aktif atau tidak berlaku di toko." }
+    }
+
+    const lines: VoucherLine[] = (input.products as Record<string, unknown>[]).map((p) => ({
+      productId: String(p.productId ?? ""),
+      price: Number(p.price ?? (p.snapshot as { price?: number } | undefined)?.price ?? 0),
+      qty: Number(p.qty ?? 0),
+    }))
+
+    const blocked = voucherBlockReason(voucher, lines)
+    if (blocked) return { success: false, message: `Voucher ${voucher.code}: ${blocked}` }
+
+    discount = voucherDiscount(voucher, lines)
+    voucherCode = voucher.code
+  }
+
+  const total = Math.max(input.subtotal - discount, 0)
+
   let transactionId: string | null
 
   try {
@@ -64,9 +96,19 @@ export async function createStoreTransactionAction(
           input.paymentMethod,
           JSON.stringify(input.products),
           input.subtotal,
-          input.total,
+          total,
         ]
       )
+
+      if (row?.id && voucherCode) {
+        await execute(
+          `UPDATE transactions
+           SET discount = ?, product_voucher_code = ?, product_voucher_discount = ?
+           WHERE id = ?`,
+          [discount, voucherCode, discount, row.id],
+          conn
+        )
+      }
 
       return row?.id ?? null
     })

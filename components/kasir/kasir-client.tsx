@@ -33,6 +33,11 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group"
 
+import {
+  voucherDiscount,
+  type KasirVoucher,
+  type VoucherLine,
+} from "@/lib/vouchers/kasir-voucher"
 import KasirDialog from "@/components/kasir/kasir-dialog"
 
 import {
@@ -445,6 +450,21 @@ export default function KasirClient({
     0
   )
 
+  // Voucher produk (channel Semua / Toko), dipilih di dialog konfirmasi.
+  // Diskon di sini perkiraan; nilai final dihitung ulang di server.
+  const [voucher, setVoucher] =
+    React.useState<KasirVoucher | null>(null)
+
+  const voucherLines: VoucherLine[] = items.map((item) => ({
+    productId: item.product.id,
+    price: getPrice(item.product, item.variant),
+    qty: item.quantity,
+  }))
+
+  const discount = voucherDiscount(voucher, voucherLines)
+
+  const payable = Math.max(total - discount, 0)
+
   const totalQuantity =
     items.reduce(
       (sum, item) =>
@@ -573,7 +593,8 @@ export default function KasirClient({
           paymentMethod,
           products,
           subtotal: total,
-          total,
+          total: payable,
+          voucherId: voucher?.id ?? null,
         })
 
       if (!result.success) {
@@ -612,6 +633,8 @@ export default function KasirClient({
       */
 
       setItems([])
+
+      setVoucher(null)
 
       setBuyerName("")
 
@@ -1041,7 +1064,12 @@ export default function KasirClient({
               setPaymentDialogOpen
             }
             items={items}
-            total={total}
+            subtotal={total}
+            discount={discount}
+            total={payable}
+            voucher={voucher}
+            voucherLines={voucherLines}
+            onVoucherChange={setVoucher}
             totalQuantity={
               totalQuantity
             }
