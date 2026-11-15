@@ -175,23 +175,9 @@ export default function KasirClient({
     product: Product,
     variant: Variant | null
   ) => {
-    const price =
-      variant?.price ??
-      product.price
-
-    const priceDisc =
-      variant?.priceDisc ??
-      product.priceDisc
-
-    if (
-      priceDisc !== null &&
-      priceDisc !== undefined &&
-      priceDisc > 0
-    ) {
-      return priceDisc
-    }
-
-    return price
+    // Harga jual = price. priceDisc adalah harga coret (harga sebelum
+    // diskon, tampil dicoret di toko online), bukan harga yang dibayar.
+    return variant?.price ?? product.price
   }
 
   const getStock = (
