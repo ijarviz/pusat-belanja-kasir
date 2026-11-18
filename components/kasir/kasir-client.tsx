@@ -8,7 +8,7 @@ import {
 } from "lucide-react"
 
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Image01Icon, BarcodeScanIcon, ShoppingBag02Icon, QrCode01Icon, CreditCardIcon, Money03Icon } from "@hugeicons/core-free-icons"
+import { Image01Icon, BarcodeScanIcon, SearchAddIcon, ShoppingBag02Icon, QrCode01Icon, CreditCardIcon, Money03Icon } from "@hugeicons/core-free-icons"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +39,7 @@ import {
   type VoucherLine,
 } from "@/lib/vouchers/kasir-voucher"
 import KasirDialog from "@/components/kasir/kasir-dialog"
+import KasirProductPicker from "@/components/kasir/kasir-product-picker"
 
 import {
   createStoreTransactionAction,
@@ -86,6 +87,9 @@ export default function KasirClient({
       variantId: string | null
       name: string
     } | null>(null)
+
+  const [pickerOpen, setPickerOpen] =
+    React.useState(false)
 
   const [barcode, setBarcode] =
     React.useState("")
@@ -215,64 +219,46 @@ export default function KasirClient({
       return
     }
 
+    addToTransaction(result.product, result.variant)
+  }
+
+  /*
+   * Tambah 1 pcs produk/varian ke daftar transaksi (dipakai scan barcode dan
+   * dialog Cari Produk). Stok habis / sudah maksimal ditolak dengan pesan.
+   */
+  const addToTransaction = (
+    product: Product,
+    variant: Variant | null
+  ) => {
     setError("")
 
-    const stock = getStock(
-      result.product,
-      result.variant
+    const stock = getStock(product, variant)
+    const label = variant
+      ? `${product.name} - ${variant.name}`
+      : product.name
+
+    const existing = items.find(
+      (item) =>
+        item.product.id === product.id &&
+        (item.variant?.id ?? null) === (variant?.id ?? null)
     )
 
-    const existingIndex =
-      items.findIndex(
-        (item) =>
-          item.product.id ===
-            result.product.id &&
-          item.variant?.id ===
-            result.variant?.id
-      )
-
-    if (existingIndex !== -1) {
-      setItems((current) => {
-        const next = [...current]
-        const item =
-          next[existingIndex]
-
-        if (
-          item.quantity >= stock
-        ) {
-          return current
-        }
-
-        next[existingIndex] = {
-          ...item,
-          quantity:
-            item.quantity + 1,
-        }
-
-        return next
-      })
-    } else {
-      if (stock <= 0) {
-        setError(
-          `Stok ${result.product.name} habis.`
+    if (stock <= 0) {
+      setError(`Stok ${label} habis.`)
+    } else if (existing && existing.quantity >= stock) {
+      setError(`Stok ${label} tersisa ${stock}, sudah semua di daftar.`)
+    } else if (existing) {
+      setItems((current) =>
+        current.map((item) =>
+          item === existing
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
         )
-
-        setBarcode("")
-
-        requestAnimationFrame(() => {
-          inputRef.current?.focus()
-        })
-
-        return
-      }
-
+      )
+    } else {
       setItems((current) => [
         ...current,
-        {
-          product: result.product,
-          variant: result.variant,
-          quantity: 1,
-        },
+        { product, variant, quantity: 1 },
       ])
     }
 
@@ -766,6 +752,23 @@ export default function KasirClient({
                     />
                   </Button>
 
+                  <Separator orientation="vertical" className="!h-10" />
+
+                  {/* Cari produk dari daftar bila barcode sulit di-scan. */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    title="Cari produk"
+                    onClick={() => setPickerOpen(true)}
+                    className="h-14 w-14"
+                  >
+                    <HugeiconsIcon
+                      icon={SearchAddIcon}
+                      size={112}
+                      className="!h-6 !w-6"
+                    />
+                  </Button>
+
                 </div>
                 
                 {error && (
@@ -1044,6 +1047,21 @@ export default function KasirClient({
 
           </Card>
           
+          {pickerOpen && (
+            <KasirProductPicker
+              products={initialProducts}
+              getPrice={getPrice}
+              onOpenChange={(open) => {
+                setPickerOpen(open)
+                if (!open) requestAnimationFrame(() => inputRef.current?.focus())
+              }}
+              onPick={(product, variant) => {
+                addToTransaction(product, variant)
+                setPickerOpen(false)
+              }}
+            />
+          )}
+
           <KasirDialog
             open={paymentDialogOpen}
             onOpenChange={
