@@ -727,7 +727,7 @@ export default function KasirClient({
                 <div className="flex gap-3 items-center">
                   <InputGroup className="h-16 ps-2 !rounded-5xl">
                     <InputGroupInput 
-                      placeholder="1234567890" 
+                      placeholder="Scan atau masukkan kode barcode produk" 
                       ref={inputRef}
                       autoFocus
                       value={barcode}
@@ -737,7 +737,7 @@ export default function KasirClient({
                         )
                       }
                       onKeyDown={handleKeyDown}
-                      className="!text-xl lg:!text-2xl"
+                      className="!text-xl lg:!text-2xl placeholder:!text-base lg:placeholder:!text-lg"
                     />
                   </InputGroup>
                   <Button
@@ -752,7 +752,7 @@ export default function KasirClient({
                     />
                   </Button>
 
-                  <Separator orientation="vertical" className="!h-10" />
+                  <Separator orientation="vertical" className="!h-10 data-vertical:self-center" />
 
                   {/* Cari produk dari daftar bila barcode sulit di-scan. */}
                   <Button

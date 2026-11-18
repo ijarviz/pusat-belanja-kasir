@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Image01Icon, Search01Icon } from "@hugeicons/core-free-icons"
 
@@ -51,7 +51,18 @@ export default function KasirProductPicker({
 }) {
   const [search, setSearch] = useState("")
   const [visible, setVisible] = useState(PAGE_SIZE)
-  const sentinel = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  // Scroll loading: tambah PAGE_SIZE baris setiap kali daftar di-scroll
+  // mendekati bawah. (Dulu IntersectionObserver, yang tidak terpicu lagi
+  // bila penanda "Memuat produk..." tetap terlihat setelah memuat.)
+  function loadMoreIfNearBottom() {
+    const el = listRef.current
+    if (!el) return
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 300) {
+      setVisible((v) => v + PAGE_SIZE)
+    }
+  }
 
   const rows = useMemo<PickerRow[]>(() => {
     const out: PickerRow[] = []
@@ -104,16 +115,6 @@ export default function KasirProductPicker({
     return rows.filter((row) => terms.every((t) => row.search.includes(t)))
   }, [rows, search])
 
-  // Muat baris berikutnya saat daftar di-scroll ke bawah.
-  useEffect(() => {
-    const el = sentinel.current
-    if (!el) return
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0]?.isIntersecting) setVisible((v) => v + PAGE_SIZE)
-    })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [filtered])
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
@@ -143,7 +144,7 @@ export default function KasirProductPicker({
 
         <div className="text-xs text-muted-foreground">{filtered.length} produk</div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-md border">
+        <div ref={listRef} onScroll={loadMoreIfNearBottom} className="min-h-0 flex-1 overflow-y-auto rounded-md border">
           {filtered.length === 0 ? (
             <div className="py-10 text-center text-sm text-muted-foreground">Produk tidak ditemukan</div>
           ) : (
@@ -191,7 +192,7 @@ export default function KasirProductPicker({
             </ul>
           )}
           {visible < filtered.length && (
-            <div ref={sentinel} className="py-3 text-center text-xs text-muted-foreground">
+            <div className="py-3 text-center text-xs text-muted-foreground">
               Memuat produk...
             </div>
           )}
