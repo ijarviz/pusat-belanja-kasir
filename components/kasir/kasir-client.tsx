@@ -100,6 +100,10 @@ export default function KasirClient({
   const [error, setError] =
     React.useState("")
 
+  // Uang Pembeli (hanya Tunai), angka tanpa titik.
+  const [cashGiven, setCashGiven] =
+    React.useState("")
+
   const [paymentMethod, setPaymentMethod] =
     React.useState<PaymentMethod>("qris")
 
@@ -608,6 +612,8 @@ export default function KasirClient({
 
       setVoucher(null)
 
+      setCashGiven("")
+
       setBuyerName("")
 
       setBuyerPhone("")
@@ -1025,6 +1031,41 @@ export default function KasirClient({
                       )
                     })}
                   </div>
+
+                  {/* TUNAI: uang pembeli & kembalian (terhadap total yang dibayar). */}
+                  {paymentMethod === "cash" && (
+                    <div className="mt-4 space-y-2">
+                      <label htmlFor="cash-given" className="text-sm text-muted-foreground">
+                        Uang Pembeli
+                      </label>
+                      <Input
+                        id="cash-given"
+                        inputMode="numeric"
+                        placeholder="0"
+                        className="h-11 text-lg"
+                        value={cashGiven ? Number(cashGiven).toLocaleString("id-ID") : ""}
+                        onChange={(event) =>
+                          setCashGiven(event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, ""))
+                        }
+                      />
+                      {cashGiven !== "" && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Kembalian</span>
+                          <span
+                            className={
+                              Number(cashGiven) < payable
+                                ? "font-semibold text-destructive"
+                                : "font-semibold"
+                            }
+                          >
+                            {Number(cashGiven) < payable
+                              ? `- ${formatCurrency(payable - Number(cashGiven))}`
+                              : formatCurrency(Number(cashGiven) - payable)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
               </div>
